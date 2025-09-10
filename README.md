@@ -75,6 +75,29 @@ sudo systemctl start kiosk.service
 
 > Note: To stop the kiosk service, use `sudo systemctl stop kiosk.service`.
 
+To set the default the speaker and mircophone:
+
+```bash
+mkdir -p ~/.config/pulse
+vim ~/.config/pulse/default.pa
+```
+
+And add 
+
+```bash
+# Load the default configuration
+.include /etc/pulse/default.pa
+
+# Set default sink (speaker)
+set-default-sink alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo
+
+# Set default source (microphone)
+set-default-source alsa_input.usb-046d_Brio_100_2513APH04BE8-02.mono-fallback
+
+# Set default speaker volume
+set-sink-volume @DEFAULT_SINK@ 50%
+```
+
 ## License
 
 This project is licensed under the terms specified in the LICENSE file.

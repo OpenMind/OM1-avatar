@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
 
 import IDLEAnimation from './animations/face/IDLE.riv';
+import ThinkAnimation from './animations/face/Think.riv';
+import TalkAnimation from './animations/face/Talk.riv';
 import loadingAnimation from './animations/openmind-logo.riv';
 
 const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8123';
@@ -14,7 +16,7 @@ function Loading() {
   )
 }
 
-function Animation() {
+function IDLE() {
   return (
     <div className='h-screen bg-black flex flex-col justify-center items-center'>
       <Rive src={IDLEAnimation} />
@@ -22,10 +24,46 @@ function Animation() {
   )
 }
 
+function Think() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={ThinkAnimation} />
+    </div>
+  )
+}
+
+function Talk() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={TalkAnimation} />
+    </div>
+  )
+}
+
+type AnimationState = 'IDLE' | 'Think' | 'Talk';
+
 export function App() {
   const [loaded, setLoaded] = useState(false);
+  const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('IDLE');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const parseMessage = (message: string): AnimationState => {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.avatar) {
+        const avatarState = data.avatar;
+        if (avatarState === 'IDLE' || avatarState === 'Think' || avatarState === 'Talk') {
+          return avatarState;
+        }
+      }
+    } catch {
+      console.log('Failed to parse message as JSON:', message);
+    }
+
+    return 'IDLE';
+  };
 
   useEffect(() => {
     const connectWebSocket = () => {
@@ -35,16 +73,21 @@ export function App() {
 
         ws.onopen = () => {
           console.log(`WebSocket connected to ${wsUrl}`);
+          setLoaded(true);
+          setCurrentAnimation('IDLE');
         };
 
         ws.onmessage = (event) => {
           console.log('Received message from WebSocket:', event.data);
-          setLoaded(true);
+          const newState = parseMessage(event.data);
+          console.log('Setting animation state to:', newState);
+          setCurrentAnimation(newState);
         };
 
         ws.onclose = (event) => {
           console.log('WebSocket connection closed:', event.code, event.reason);
           setLoaded(false);
+          setCurrentAnimation('IDLE');
 
           reconnectTimeoutRef.current = setTimeout(() => {
             console.log('Attempting to reconnect...');
@@ -77,13 +120,23 @@ export function App() {
     };
   }, []);
 
+  const renderCurrentAnimation = () => {
+    switch (currentAnimation) {
+      case 'Talk':
+        return <Talk />;
+      case 'Think':
+        return <Think />;
+      case 'IDLE':
+      default:
+        return <IDLE />;
+    }
+  };
+
   if (!loaded) {
     return <Loading />
   }
 
-  return (
-    <Animation />
-  )
+  return renderCurrentAnimation();
 }
 
 export default App;
