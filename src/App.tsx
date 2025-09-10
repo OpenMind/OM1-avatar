@@ -49,19 +49,9 @@ export function App() {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const parseMessage = (message: string): AnimationState => {
-    try {
-      const data = JSON.parse(message);
-
-      if (data.avatar) {
-        const avatarState = data.avatar;
-        if (avatarState === 'IDLE' || avatarState === 'Think' || avatarState === 'Talk') {
-          return avatarState;
-        }
-      }
-    } catch {
-      console.log('Failed to parse message as JSON:', message);
+    if (message === 'IDLE' || message === 'Think' || message === 'Talk') {
+      return message;
     }
-
     return 'IDLE';
   };
 
