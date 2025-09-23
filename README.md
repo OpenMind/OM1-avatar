@@ -78,24 +78,33 @@ sudo systemctl start kiosk.service
 To set the default the speaker and mircophone:
 
 ```bash
-mkdir -p ~/.config/pulse
-vim ~/.config/pulse/default.pa
+mkdir -p ~/.config/systemd/user
+vim ~/.config/systemd/user/audio-defaults.service
 ```
 
-And add 
+And add
 
 ```bash
-# Load the default configuration
-.include /etc/pulse/default.pa
+[Unit]
+Description=Set Default Audio Devices
+After=pulseaudio.service
+Wants=pulseaudio.service
 
-# Set default sink (speaker)
-set-default-sink alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'sleep 5 && pactl set-default-sink alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo && pactl set-default-source alsa_input.usb-046d_C270_HD_WEBCAM_2D2A4B40-02.mono-fallback'
 
-# Set default source (microphone)
-set-default-source alsa_input.usb-046d_Brio_100_2513APH04BE8-02.mono-fallback
+[Install]
+WantedBy=default.target
+```
 
-# Set default speaker volume
-set-sink-volume @DEFAULT_SINK@ 50%
+Enable and start the audio defaults service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable audio-defaults.service
+sudo systemctl start audio-defaults.service
 ```
 
 ## License
