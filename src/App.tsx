@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
 
-import IDLEAnimation from './animations/face/IDLE.riv';
 import ThinkAnimation from './animations/face/Think.riv';
-import TalkAnimation from './animations/face/Talk.riv';
+import ConfusedAnimation from './animations/face/Confused.riv';
+import CuriousAnimation from './animations/face/Curious.riv';
+import ExcitedAnimation from './animations/face/Excited.riv';
+import HappyAnimation from './animations/face/Happy.riv';
+import SadAnimation from './animations/face/Sad.riv';
 import loadingAnimation from './animations/openmind-logo.riv';
 
 const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8123';
@@ -16,14 +19,6 @@ function Loading() {
   )
 }
 
-function IDLE() {
-  return (
-    <div className='h-screen bg-black flex flex-col justify-center items-center'>
-      <Rive src={IDLEAnimation} />
-    </div>
-  )
-}
-
 function Think() {
   return (
     <div className='h-screen bg-black flex flex-col justify-center items-center'>
@@ -32,27 +27,59 @@ function Think() {
   )
 }
 
-function Talk() {
+function Confused() {
   return (
     <div className='h-screen bg-black flex flex-col justify-center items-center'>
-      <Rive src={TalkAnimation} />
+      <Rive src={ConfusedAnimation} />
     </div>
   )
 }
 
-type AnimationState = 'IDLE' | 'Think' | 'Talk';
+function Curious() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={CuriousAnimation} />
+    </div>
+  )
+}
+
+function Excited() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={ExcitedAnimation} />
+    </div>
+  )
+}
+
+function Happy() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={HappyAnimation} />
+    </div>
+  )
+}
+
+function Sad() {
+  return (
+    <div className='h-screen bg-black flex flex-col justify-center items-center'>
+      <Rive src={SadAnimation} />
+    </div>
+  )
+}
+
+type AnimationState = 'Confused' | 'Curious' | 'Excited' | 'Happy' | 'Sad' | 'Think';
 
 export function App() {
   const [loaded, setLoaded] = useState(false);
-  const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('IDLE');
+  const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('Happy');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const parseMessage = (message: string): AnimationState => {
-    if (message === 'IDLE' || message === 'Think' || message === 'Talk') {
+    if ( message === 'Confused' || message === 'Curious' || message === 'Excited' || message === 'Happy' || message === 'Sad' || message === 'Think') {
       return message;
     }
-    return 'IDLE';
+    return 'Happy';
   };
 
   useEffect(() => {
@@ -64,7 +91,7 @@ export function App() {
         ws.onopen = () => {
           console.log(`WebSocket connected to ${wsUrl}`);
           setLoaded(true);
-          setCurrentAnimation('IDLE');
+          setCurrentAnimation('Happy');
         };
 
         ws.onmessage = (event) => {
@@ -77,7 +104,7 @@ export function App() {
         ws.onclose = (event) => {
           console.log('WebSocket connection closed:', event.code, event.reason);
           setLoaded(false);
-          setCurrentAnimation('IDLE');
+          setCurrentAnimation('Happy');
 
           reconnectTimeoutRef.current = setTimeout(() => {
             console.log('Attempting to reconnect...');
@@ -112,13 +139,20 @@ export function App() {
 
   const renderCurrentAnimation = () => {
     switch (currentAnimation) {
-      case 'Talk':
-        return <Talk />;
       case 'Think':
         return <Think />;
-      case 'IDLE':
+      case 'Confused':
+        return <Confused />;
+      case 'Curious':
+        return <Curious />;
+      case 'Excited':
+        return <Excited />;
+      case 'Happy':
+        return <Happy />;
+      case 'Sad':
+        return <Sad />;
       default:
-        return <IDLE />;
+        return <Happy />;
     }
   };
 
