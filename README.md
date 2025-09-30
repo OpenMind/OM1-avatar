@@ -1,3 +1,4 @@
+
 # OM1 Avatar
 
 A modern React-based frontend application that provides the user interface and avatar display system for OM1 robotics software. This application features interactive Rive animations and serves as the primary visual interface for OM1 robotic systems.
@@ -19,6 +20,18 @@ Install `unclutter` on your system to hide the mouse cursor after a period of in
 
 ```bash
 sudo apt install unclutter
+```
+
+Install Chromium and lock the `snapd` version for stability:
+
+```bash
+sudo snap install chromium
+```
+```bash
+snap download snapd --revision=24724
+sudo snap ack snapd_24724.assert
+sudo snap install snapd_24724.snap
+sudo snap refresh --hold snapd
 ```
 
 Add the script to `/usr/local/bin/start-kiosk.sh` and make it executable:
@@ -98,19 +111,27 @@ ExecStart=/bin/bash -c 'sleep 5 && pactl set-default-sink alsa_output.usb-Solid_
 [Install]
 WantedBy=default.target
 ```
+Use 
+```bash
+pactl list short
+```
+and replace ```alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo``` with your speaker source and ```alsa_input.usb-046d_C270_HD_WEBCAM_2D2A4B40-02.mono-fallback``` with mic source 
 
 Enable and start the audio defaults service:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable audio-defaults.service
-sudo systemctl start audio-defaults.service
+systemctl --user daemon-reload
+systemctl --user enable audio-defaults.service
+systemctl --user start audio-defaults.service
 ```
 
 ## License
 
 This project is licensed under the terms specified in the LICENSE file.
 
----
+-----
 
 **Note**: This frontend application is designed to work in conjunction with OM1 robotics backend systems and hardware components.
+
+```
+```
