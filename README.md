@@ -1,4 +1,3 @@
-
 # OM1 Avatar
 
 A modern React-based frontend application that provides the user interface and avatar display system for OM1 robotics software. This application features interactive Rive animations and serves as the primary visual interface for OM1 robotic systems.
