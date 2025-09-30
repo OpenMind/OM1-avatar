@@ -132,6 +132,3 @@ This project is licensed under the terms specified in the LICENSE file.
 -----
 
 **Note**: This frontend application is designed to work in conjunction with OM1 robotics backend systems and hardware components.
-
-```
-```
