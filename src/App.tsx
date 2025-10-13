@@ -13,7 +13,7 @@ const om1WsUrl = import.meta.env.VITE_OM1_WEBSOCKET_URL || 'ws://localhost:8123'
 const apiWsUrl = import.meta.env.VITE_API_WEBSOCKET_URL || 'ws://localhost:6123';
 const omApiKey = import.meta.env.VITE_OM_API_KEY || '';
 const omApiKeyId = import.meta.env.VITE_OM_API_KEY_ID || '';
-const publishStatusApiUrl = 'https://api-dev.openmind.org/api/core/teleops/video/publish/status';
+const publishStatusApiUrl = 'https://api.openmind.org/api/core/teleops/video/publish/status';
 const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.org';
 const publishStatusCheckInterval = 5000;
 
