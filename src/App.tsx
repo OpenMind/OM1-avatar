@@ -11,6 +11,11 @@ import loadingAnimation from './animations/openmind-logo.riv';
 
 const om1WsUrl = import.meta.env.VITE_OM1_WEBSOCKET_URL || 'ws://localhost:8123';
 const apiWsUrl = import.meta.env.VITE_API_WEBSOCKET_URL || 'ws://localhost:6123';
+const omApiKey = import.meta.env.VITE_OM_API_KEY || '';
+const omApiKeyId = import.meta.env.VITE_OM_API_KEY_ID || '';
+const publishStatusApiUrl = 'https://api-dev.openmind.org/api/core/teleops/video/publish/status';
+const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.org';
+const publishStatusCheckInterval = 5000;
 
 function Loading() {
   return (
@@ -76,11 +81,14 @@ export function App() {
   const [allModes, setAllModes] = useState<string[]>([]);
   const [currentMode, setCurrentMode] = useState<string>('');
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const om1WsRef = useRef<WebSocket | null>(null);
   const apiWsRef = useRef<WebSocket | null>(null);
   const om1ReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const apiReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const apiIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isPublishingRef = useRef<boolean>(false);
 
   const parseMessage = (message: string): AnimationState => {
     if ( message === 'Confused' || message === 'Curious' || message === 'Excited' || message === 'Happy' || message === 'Sad' || message === 'Think') {
@@ -109,6 +117,38 @@ export function App() {
       apiWsRef.current.send(message);
       console.log('Sent mode switch to API WebSocket:', message);
       setShowModeSelector(false);
+    }
+  };
+
+  const checkPublishStatus = async () => {
+    if (!omApiKey) return;
+
+    try {
+      const response = await fetch(publishStatusApiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${omApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const isLive = data.status === 'live';
+        
+        if (isLive !== isPublishingRef.current) {
+          isPublishingRef.current = isLive;
+          setIsPublishing(isLive);
+        }
+      } else if (isPublishingRef.current) {
+        isPublishingRef.current = false;
+        setIsPublishing(false);
+      }
+    } catch (error) {
+      if (isPublishingRef.current) {
+        isPublishingRef.current = false;
+        setIsPublishing(false);
+      }
     }
   };
 
@@ -238,6 +278,14 @@ export function App() {
     connectOm1WebSocket();
     connectApiWebSocket();
 
+    // Start publish status checking
+    if (omApiKey) {
+      checkPublishStatus();
+      publishCheckIntervalRef.current = setInterval(() => {
+        checkPublishStatus();
+      }, publishStatusCheckInterval);
+    }
+
     return () => {
       if (om1ReconnectTimeoutRef.current) {
         clearTimeout(om1ReconnectTimeoutRef.current);
@@ -248,6 +296,9 @@ export function App() {
       if (apiIntervalRef.current) {
         clearInterval(apiIntervalRef.current);
       }
+      if (publishCheckIntervalRef.current) {
+        clearInterval(publishCheckIntervalRef.current);
+      }
       if (om1WsRef.current) {
         om1WsRef.current.close();
       }
@@ -256,6 +307,11 @@ export function App() {
       }
     };
   }, []);
+
+  // Sync isPublishing state to ref
+  useEffect(() => {
+    isPublishingRef.current = isPublishing;
+  }, [isPublishing]);
 
   // Separate effect to handle interval timing changes based on mode
   useEffect(() => {
@@ -329,6 +385,24 @@ export function App() {
     </div>
   );
 
+  // Show WebRTC video player when publishing is active (regardless of loaded state)
+  if (isPublishing && omApiKey && omApiKeyId) {
+    const playerUrl = `${webrtcPlayerBaseUrl}/portal/${omApiKeyId}/?api_key=${omApiKey}`;
+    
+    return (
+      <>
+        <iframe 
+          src={playerUrl}
+          className="w-full h-screen border-0"
+          allow="autoplay; camera; microphone"
+          title="WebRTC Video Stream"
+        />
+        <ModeSelector />
+      </>
+    );
+  }
+
+  // Show loading if OM1 WebSocket not connected
   if (!loaded) {
     return (
       <>
@@ -338,6 +412,7 @@ export function App() {
     )
   }
 
+  // Show animations when connected and not publishing
   return (
     <>
       {renderCurrentAnimation()}
