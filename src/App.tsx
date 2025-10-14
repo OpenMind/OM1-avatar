@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
+import { WebRTCVideoStream } from './components/WebRTCVideoStream';
 
 import ThinkAnimation from './animations/face/Think.riv';
 import ConfusedAnimation from './animations/face/Confused.riv';
@@ -14,7 +15,6 @@ const apiWsUrl = import.meta.env.VITE_API_WEBSOCKET_URL || 'ws://localhost:6123'
 const omApiKey = import.meta.env.VITE_OM_API_KEY || '';
 const omApiKeyId = import.meta.env.VITE_OM_API_KEY_ID || '';
 const publishStatusApiUrl = 'https://api.openmind.org/api/core/teleops/video/publish/status';
-const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.org';
 const publishStatusCheckInterval = 5000;
 
 function Loading() {
@@ -389,15 +389,12 @@ export function App() {
 
   // Show WebRTC video player when publishing is active (regardless of loaded state)
   if (isPublishing && omApiKey && omApiKeyId) {
-    const playerUrl = `${webrtcPlayerBaseUrl}/portal/${omApiKeyId}/?api_key=${omApiKey}`;
-
     return (
       <>
-        <iframe
-          src={playerUrl}
-          className="w-full h-screen border-0"
-          allow="autoplay; camera; microphone"
-          title="WebRTC Video Stream"
+        <WebRTCVideoStream
+          apiKey={omApiKey}
+          apiKeyId={omApiKeyId}
+          isPublishing={isPublishing}
         />
         <ModeSelector />
       </>
