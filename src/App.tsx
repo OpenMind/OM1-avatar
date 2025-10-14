@@ -121,8 +121,6 @@ export function App() {
   };
 
   const checkPublishStatus = async () => {
-    console.log(`Checking publish status from ${publishStatusApiUrl} with API key ${omApiKeyId} and ${omApiKey}`);
-
     if (!omApiKey) return;
 
     try {
@@ -280,7 +278,6 @@ export function App() {
     connectOm1WebSocket();
     connectApiWebSocket();
 
-    console.log('OM API Key ID:', omApiKeyId, 'OM API Key:', omApiKey);
     if (omApiKey) {
       checkPublishStatus();
       publishCheckIntervalRef.current = setInterval(() => {
