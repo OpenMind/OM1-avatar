@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
+import { getEnvVar } from './utils/env';
 
 import ThinkAnimation from './animations/face/Think.riv';
 import ConfusedAnimation from './animations/face/Confused.riv';
@@ -8,11 +9,10 @@ import ExcitedAnimation from './animations/face/Excited.riv';
 import HappyAnimation from './animations/face/Happy.riv';
 import SadAnimation from './animations/face/Sad.riv';
 import loadingAnimation from './animations/openmind-logo.riv';
-
-const om1WsUrl = import.meta.env.VITE_OM1_WEBSOCKET_URL || 'ws://localhost:8123';
-const apiWsUrl = import.meta.env.VITE_API_WEBSOCKET_URL || 'ws://localhost:6123';
-const omApiKey = import.meta.env.VITE_OM_API_KEY || '';
-const omApiKeyId = import.meta.env.VITE_OM_API_KEY_ID || '';
+const om1WsUrl = getEnvVar('VITE_OM1_WEBSOCKET_URL', 'ws://localhost:8123');
+const apiWsUrl = getEnvVar('VITE_API_WEBSOCKET_URL', 'ws://localhost:6123');
+const omApiKey = getEnvVar('VITE_OM_API_KEY');
+const omApiKeyId = getEnvVar('VITE_OM_API_KEY_ID');
 const publishStatusApiUrl = 'https://api.openmind.org/api/core/teleops/video/publish/status';
 const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.org';
 const publishStatusCheckInterval = 5000;
