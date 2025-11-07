@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
 import { WebRTCVideoStream } from './components/WebRTCVideoStream';
+import { Subtitles } from './components/Subtitles';
 import { getEnvVar } from './utils/env';
 
 import ThinkAnimation from './animations/face/Think.riv';
@@ -82,6 +83,7 @@ export function App() {
   const [currentMode, setCurrentMode] = useState<string>('');
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [asrText, setAsrText] = useState<string>('');
   const om1WsRef = useRef<WebSocket | null>(null);
   const apiWsRef = useRef<WebSocket | null>(null);
   const om1ReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -89,6 +91,7 @@ export function App() {
   const apiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPublishingRef = useRef<boolean>(false);
+  const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const parseMessage = (message: string): AnimationState => {
     if ( message === 'Confused' || message === 'Curious' || message === 'Excited' || message === 'Happy' || message === 'Sad' || message === 'Think') {
@@ -224,12 +227,31 @@ export function App() {
           try {
             const response = JSON.parse(event.data);
 
+            // Handle ASR subtitle messages
+            if (response.type === 'asr' && response.text) {
+              setAsrText(response.text);
+              console.log('ASR subtitle received:', response.text);
+              
+              // Clear existing timeout
+              if (asrTextTimeoutRef.current) {
+                clearTimeout(asrTextTimeoutRef.current);
+              }
+              
+              // Clear subtitle after 5 seconds
+              asrTextTimeoutRef.current = setTimeout(() => {
+                setAsrText('');
+              }, 5000);
+              return;
+            }
+
+            // Handle mode switch responses
             if (response.code === 0 && response.message && response.message.includes("Successfully switched to mode")) {
               console.log('Mode switch successful, requesting updated mode info');
               sendGetMode();
               return;
             }
 
+            // Handle mode status responses
             if (response.message) {
               const modeData = JSON.parse(response.message);
               if (modeData.all_modes && Array.isArray(modeData.all_modes)) {
@@ -291,6 +313,9 @@ export function App() {
       }
       if (apiReconnectTimeoutRef.current) {
         clearTimeout(apiReconnectTimeoutRef.current);
+      }
+      if (asrTextTimeoutRef.current) {
+        clearTimeout(asrTextTimeoutRef.current);
       }
       if (apiIntervalRef.current) {
         clearInterval(apiIntervalRef.current);
@@ -394,6 +419,7 @@ export function App() {
           isPublishing={isPublishing}
         />
         <ModeSelector />
+        <Subtitles text={asrText} />
       </>
     );
   }
@@ -404,6 +430,7 @@ export function App() {
       <>
         <ModeSelector />
         <Loading />
+        <Subtitles text={asrText} />
       </>
     )
   }
@@ -413,6 +440,7 @@ export function App() {
     <>
       {renderCurrentAnimation()}
       <ModeSelector />
+      <Subtitles text={asrText} />
     </>
   );
 }
