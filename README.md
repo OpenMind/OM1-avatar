@@ -163,7 +163,6 @@ pactl list short
 
 and replace ```alsa_output.platform-88090b0000.hda.hdmi-stereo``` with your speaker source and ```alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback``` with mic source
 
-
 Then make it executable:
 
 ```bash
