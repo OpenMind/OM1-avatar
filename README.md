@@ -96,6 +96,83 @@ sudo systemctl start kiosk.service
 To set the default the speaker and mircophone:
 
 ```bash
+vim /usr/local/bin/set-audio-defaults.sh
+```
+
+The add:
+
+```
+#!/bin/bash
+set -e
+
+sleep 5
+
+# First, set the master source volume to 100%
+pactl set-source-volume "alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" 65536
+pactl set-source-mute "alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" 0
+
+# Unload then load AEC module
+pactl unload-module module-echo-cancel || true
+pactl load-module module-echo-cancel \
+  use_master_format=1 \
+  aec_method=webrtc \
+  source_master="alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" \
+  sink_master="alsa_output.platform-88090b0000.hda.hdmi-stereo" \
+  source_name="default_mic_aec" \
+  sink_name="default_output_aec" \
+  source_properties="device.description=Microphone_with_AEC" \
+  sink_properties="device.description=Speaker_with_AEC"
+
+# Wait a moment for the module to fully initialize
+sleep 2
+
+# Set defaults
+pactl set-default-source default_mic_aec
+pactl set-default-sink default_output_aec
+
+# Retry volume setting until device appears and volume is set correctly
+for i in {1..15}; do
+  if pactl list short sources | grep -q default_mic_aec; then
+    # Set volume to 100% (65536)
+    pactl set-source-volume default_mic_aec 65536
+    pactl set-source-mute default_mic_aec 0
+
+    # Verify the volume was set
+    CURRENT_VOL=$(pactl list sources | grep -A 7 "Name: default_mic_aec" | grep "Volume:" | awk '{print $3}')
+
+    if [ "$CURRENT_VOL" = "65536" ]; then
+      echo "Microphone volume successfully set to 100%"
+      break
+    else
+      echo "Volume is $CURRENT_VOL, retrying... ($i/15)"
+    fi
+  else
+    echo "Waiting for AEC source to appear... ($i/15)"
+  fi
+  sleep 1
+done
+
+# Final verification
+pactl list sources | grep -A 7 "Name: default_mic_aec" | grep -E "Name:|Volume:"
+```
+
+Use
+```bash
+pactl list short
+```
+
+and replace ```alsa_output.platform-88090b0000.hda.hdmi-stereo``` with your speaker source and ```alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback``` with mic source
+
+
+Then make it executable:
+
+```bash
+chmod +x /usr/local/bin/set-audio-defaults.sh
+```
+
+Create a systemd user service to run the script on login:
+
+```bash
 mkdir -p ~/.config/systemd/user
 vim ~/.config/systemd/user/audio-defaults.service
 ```
@@ -111,28 +188,11 @@ Wants=pulseaudio.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash -c '\
-  sleep 5 && \
-  pactl unload-module module-echo-cancel || true && \
-  pactl load-module module-echo-cancel \
-    aec_method=webrtc \
-    source_master=alsa_input.usb-046d_Brio_101_2520APKJ1778-02.mono-fallback \
-    sink_master=alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo \
-    source_name=default_mic_aec \
-    sink_name=default_output_aec \
-    source_properties="device.description=Microphone_with_AEC" \
-    sink_properties="device.description=Speaker_with_AEC" && \
-  pactl set-default-source default_mic_aec && \
-  pactl set-default-sink default_output_aec'
+ExecStart=/usr/local/bin/set-audio-defaults.sh
 
 [Install]
 WantedBy=default.target
 ```
-Use
-```bash
-pactl list short
-```
-and replace ```alsa_output.usb-Solid_State_System_Co._Ltd._USB_PnP_Audio_Device_000000000000-00.analog-stereo``` with your speaker source and ```alsa_input.usb-046d_Brio_101_2520APKJ1778-02.mono-fallback``` with mic source
 
 Enable and start the audio defaults service:
 
