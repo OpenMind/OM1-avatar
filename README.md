@@ -49,7 +49,13 @@ while ! nc -z $HOST $PORT; do
   sleep 0.1
 done
 
-exec chromium --kiosk http://$HOST:$PORT --disable-infobars --noerrdialogs
+# Launch with autoplay permissions
+exec chromium \
+  --kiosk http://$HOST:$PORT \
+  --disable-infobars \
+  --noerrdialogs \
+  --autoplay-policy=no-user-gesture-required \
+  --disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies
 ```
 
 Make the script executable:
