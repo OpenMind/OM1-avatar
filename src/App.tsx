@@ -11,7 +11,6 @@ import ExcitedAnimation from './animations/face/Excited.riv';
 import HappyAnimation from './animations/face/Happy.riv';
 import SadAnimation from './animations/face/Sad.riv';
 import loadingAnimation from './animations/openmind-logo.riv';
-const om1WsUrl = getEnvVar('VITE_OM1_WEBSOCKET_URL', 'ws://localhost:8123');
 const apiWsUrl = getEnvVar('VITE_API_WEBSOCKET_URL', 'ws://localhost:6123');
 const omApiKey = getEnvVar('VITE_OM_API_KEY');
 const omApiKeyId = getEnvVar('VITE_OM_API_KEY_ID');
@@ -74,30 +73,80 @@ function Sad() {
   )
 }
 
-type AnimationState = 'Confused' | 'Curious' | 'Excited' | 'Happy' | 'Sad' | 'Think';
+const ANIMATION_STATES = [
+  'confused',
+  'curious',
+  'excited',
+  'happy',
+  'sad',
+  'think',
+] as const;
+
+type AnimationState = (typeof ANIMATION_STATES)[number];
 
 export function App() {
   const [loaded, setLoaded] = useState(false);
-  const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('Happy');
+  const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('happy');
   const [allModes, setAllModes] = useState<string[]>([]);
   const [currentMode, setCurrentMode] = useState<string>('');
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
-  const om1WsRef = useRef<WebSocket | null>(null);
   const apiWsRef = useRef<WebSocket | null>(null);
-  const om1ReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const apiReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const apiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPublishingRef = useRef<boolean>(false);
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const parseMessage = (message: string): AnimationState => {
-    if ( message === 'Confused' || message === 'Curious' || message === 'Excited' || message === 'Happy' || message === 'Sad' || message === 'Think') {
-      return message;
+  // WebSocket Message Handlers
+  // Avatar Face
+  const handleAvatarMessage = (face: string) => {
+    const normalizedFace = face.toLowerCase() as AnimationState;
+    
+    if (ANIMATION_STATES.includes(normalizedFace)) {
+      console.log('Avatar face received:', face, '-> Setting animation to:', normalizedFace);
+      setCurrentAnimation(normalizedFace);
+    } else {
+      console.warn('Unknown avatar face:', face, '-> Defaulting to: happy');
+      setCurrentAnimation('happy');
     }
-    return 'Happy';
+  };
+  // ASR
+  const handleAsrMessage = (text: string) => {
+    console.log('ASR subtitle received:', text);
+    setAsrText(text);
+    
+    if (asrTextTimeoutRef.current) {
+      clearTimeout(asrTextTimeoutRef.current);
+    }
+    
+    asrTextTimeoutRef.current = setTimeout(() => {
+      setAsrText('');
+    }, 5000);
+  };
+  // Mode
+  const handleModeResponse = (message: string) => {
+    try {
+      const modeData = JSON.parse(message);
+      if (modeData.all_modes && Array.isArray(modeData.all_modes)) {
+        setAllModes(modeData.all_modes);
+      }
+      if (modeData.current_mode) {
+        setCurrentMode(modeData.current_mode);
+      }
+      console.log('Updated modes:', {
+        current: modeData.current_mode,
+        all: modeData.all_modes
+      });
+    } catch (error) {
+      console.error('Error parsing mode response:', error);
+    }
+  };
+
+  const handleModeSwitchSuccess = () => {
+    console.log('Mode switch successful');
+    sendGetMode();
   };
 
   const sendGetMode = () => {
@@ -156,48 +205,6 @@ export function App() {
   };
 
   useEffect(() => {
-    const connectOm1WebSocket = () => {
-      try {
-        const ws = new WebSocket(om1WsUrl);
-        om1WsRef.current = ws;
-
-        ws.onopen = () => {
-          console.log(`OM1 WebSocket connected to ${om1WsUrl}`);
-          setLoaded(true);
-          setCurrentAnimation('Happy');
-        };
-
-        ws.onmessage = (event) => {
-          console.log('Received message from OM1 WebSocket:', event.data);
-          const newState = parseMessage(event.data);
-          console.log('Setting animation state to:', newState);
-          setCurrentAnimation(newState);
-        };
-
-        ws.onclose = (event) => {
-          console.log('OM1 WebSocket connection closed:', event.code, event.reason);
-          setLoaded(false);
-          setCurrentAnimation('Happy');
-
-          om1ReconnectTimeoutRef.current = setTimeout(() => {
-            console.log('Attempting to reconnect OM1 WebSocket...');
-            connectOm1WebSocket();
-          }, 500);
-        };
-
-        ws.onerror = (error) => {
-          console.error('OM1 WebSocket error:', error);
-        };
-
-      } catch (error) {
-        console.error('Failed to create OM1 WebSocket connection:', error);
-
-        om1ReconnectTimeoutRef.current = setTimeout(() => {
-          connectOm1WebSocket();
-        }, 2000);
-      }
-    };
-
     const connectApiWebSocket = () => {
       try {
         const apiWs = new WebSocket(apiWsUrl);
@@ -205,6 +212,8 @@ export function App() {
 
         apiWs.onopen = () => {
           console.log(`API WebSocket connected to ${apiWsUrl}`);
+          setLoaded(true);
+          setCurrentAnimation('happy');
 
           const requestId = crypto.randomUUID();
           const initMessage = JSON.stringify({ action: "get_mode", request_id: requestId });
@@ -227,43 +236,24 @@ export function App() {
           try {
             const response = JSON.parse(event.data);
 
-            // Handle ASR subtitle messages
+            // Route message to appropriate handler
+            if (response.type === 'avatar' && response.face) {
+              handleAvatarMessage(response.face);
+              return;
+            }
+
             if (response.type === 'asr' && response.text) {
-              setAsrText(response.text);
-              console.log('ASR subtitle received:', response.text);
-              
-              // Clear existing timeout
-              if (asrTextTimeoutRef.current) {
-                clearTimeout(asrTextTimeoutRef.current);
-              }
-              
-              // Clear subtitle after 5 seconds
-              asrTextTimeoutRef.current = setTimeout(() => {
-                setAsrText('');
-              }, 5000);
+              handleAsrMessage(response.text);
               return;
             }
 
-            // Handle mode switch responses
             if (response.code === 0 && response.message && response.message.includes("Successfully switched to mode")) {
-              console.log('Mode switch successful, requesting updated mode info');
-              sendGetMode();
+              handleModeSwitchSuccess();
               return;
             }
 
-            // Handle mode status responses
             if (response.message) {
-              const modeData = JSON.parse(response.message);
-              if (modeData.all_modes && Array.isArray(modeData.all_modes)) {
-                setAllModes(modeData.all_modes);
-              }
-              if (modeData.current_mode) {
-                setCurrentMode(modeData.current_mode);
-              }
-              console.log('Updated modes:', {
-                current: modeData.current_mode,
-                all: modeData.all_modes
-              });
+              handleModeResponse(response.message);
             }
           } catch (error) {
             console.error('Error parsing API response:', error);
@@ -272,6 +262,8 @@ export function App() {
 
         apiWs.onclose = (event) => {
           console.log('API WebSocket connection closed:', event.code, event.reason);
+          setLoaded(false);
+          setCurrentAnimation('happy');
 
           if (apiIntervalRef.current) {
             clearInterval(apiIntervalRef.current);
@@ -297,7 +289,6 @@ export function App() {
       }
     };
 
-    connectOm1WebSocket();
     connectApiWebSocket();
 
     if (omApiKey) {
@@ -308,9 +299,6 @@ export function App() {
     }
 
     return () => {
-      if (om1ReconnectTimeoutRef.current) {
-        clearTimeout(om1ReconnectTimeoutRef.current);
-      }
       if (apiReconnectTimeoutRef.current) {
         clearTimeout(apiReconnectTimeoutRef.current);
       }
@@ -322,9 +310,6 @@ export function App() {
       }
       if (publishCheckIntervalRef.current) {
         clearInterval(publishCheckIntervalRef.current);
-      }
-      if (om1WsRef.current) {
-        om1WsRef.current.close();
       }
       if (apiWsRef.current) {
         apiWsRef.current.close();
@@ -357,17 +342,17 @@ export function App() {
 
   const renderCurrentAnimation = () => {
     switch (currentAnimation) {
-      case 'Think':
+      case 'think':
         return <Think />;
-      case 'Confused':
+      case 'confused':
         return <Confused />;
-      case 'Curious':
+      case 'curious':
         return <Curious />;
-      case 'Excited':
+      case 'excited':
         return <Excited />;
-      case 'Happy':
+      case 'happy':
         return <Happy />;
-      case 'Sad':
+      case 'sad':
         return <Sad />;
       default:
         return <Happy />;
