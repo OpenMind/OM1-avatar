@@ -73,7 +73,16 @@ function Sad() {
   )
 }
 
-type AnimationState = 'confused' | 'curious' | 'excited' | 'happy' | 'sad' | 'think';
+const ANIMATION_STATES = [
+  'confused',
+  'curious',
+  'excited',
+  'happy',
+  'sad',
+  'think',
+] as const;
+
+type AnimationState = (typeof ANIMATION_STATES)[number];
 
 export function App() {
   const [loaded, setLoaded] = useState(false);
@@ -93,10 +102,9 @@ export function App() {
   // WebSocket Message Handlers
   // Avatar Face
   const handleAvatarMessage = (face: string) => {
-    const validStates: AnimationState[] = ['confused', 'curious', 'excited', 'happy', 'sad', 'think'];
     const normalizedFace = face.toLowerCase() as AnimationState;
     
-    if (validStates.includes(normalizedFace)) {
+    if (ANIMATION_STATES.includes(normalizedFace)) {
       console.log('Avatar face received:', face, '-> Setting animation to:', normalizedFace);
       setCurrentAnimation(normalizedFace);
     } else {
