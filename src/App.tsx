@@ -98,6 +98,8 @@ export function App() {
   const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPublishingRef = useRef<boolean>(false);
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const healthCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const healthCheckRequestIdRef = useRef<string | null>(null);
 
   // WebSocket Message Handlers
   // Avatar Face
@@ -212,9 +214,26 @@ export function App() {
 
         apiWs.onopen = () => {
           console.log(`API WebSocket connected to ${apiWsUrl}`);
-          setLoaded(true);
-          setCurrentAnimation('happy');
-
+          
+          // Send avatar health check request
+          const avatarRequestId = crypto.randomUUID();
+          healthCheckRequestIdRef.current = avatarRequestId;
+          const healthCheckRequest = JSON.stringify({ 
+            action: "get_avatar_status", 
+            request_id: avatarRequestId 
+          });
+          apiWs.send(healthCheckRequest);
+          console.log('Sent avatar health check request:', healthCheckRequest);
+          
+          // 60 second timeout for health check
+          healthCheckTimeoutRef.current = setTimeout(() => {
+            if (!loaded) {
+              console.warn('OM1 health check timeout - no response in 60 seconds');
+              // Keep loaded=false, will show Loading animation
+            }
+          }, 60000);
+          
+          // Also send get_mode for initial mode info
           const requestId = crypto.randomUUID();
           const initMessage = JSON.stringify({ action: "get_mode", request_id: requestId });
           apiWs.send(initMessage);
@@ -247,6 +266,27 @@ export function App() {
               return;
             }
 
+            // Handle avatar health check response
+            if (response.request_id === healthCheckRequestIdRef.current) {
+              if (response.message === 'Avatar system active') {
+                console.log('Received avatar health check response:', response);
+                if (!loaded) {
+                  setLoaded(true);
+                  setCurrentAnimation('happy');
+                }
+              } else {
+                console.warn('OM1 avatar health check failed:', response.message);
+              }
+              
+              // Clear health check timeout
+              if (healthCheckTimeoutRef.current) {
+                clearTimeout(healthCheckTimeoutRef.current);
+                healthCheckTimeoutRef.current = null;
+              }
+              healthCheckRequestIdRef.current = null;
+              return;
+            }
+
             if (response.code === 0 && response.message && response.message.includes("Successfully switched to mode")) {
               handleModeSwitchSuccess();
               return;
@@ -269,6 +309,13 @@ export function App() {
             clearInterval(apiIntervalRef.current);
             apiIntervalRef.current = null;
           }
+          
+          if (healthCheckTimeoutRef.current) {
+            clearTimeout(healthCheckTimeoutRef.current);
+            healthCheckTimeoutRef.current = null;
+          }
+          
+          healthCheckRequestIdRef.current = null;
 
           apiReconnectTimeoutRef.current = setTimeout(() => {
             console.log('Attempting to reconnect API WebSocket...');
@@ -304,6 +351,9 @@ export function App() {
       }
       if (asrTextTimeoutRef.current) {
         clearTimeout(asrTextTimeoutRef.current);
+      }
+      if (healthCheckTimeoutRef.current) {
+        clearTimeout(healthCheckTimeoutRef.current);
       }
       if (apiIntervalRef.current) {
         clearInterval(apiIntervalRef.current);
