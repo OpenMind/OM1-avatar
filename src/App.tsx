@@ -257,7 +257,6 @@ export function App() {
           healthCheckIntervalRef.current = setInterval(() => {
             sendHealthCheck(apiWs);
           }, 2000);
-          console.log('Started avatar health check polling (every 2 seconds)');
           
           const requestId = crypto.randomUUID();
           const initMessage = JSON.stringify({ action: "get_mode", request_id: requestId });
@@ -490,7 +489,7 @@ export function App() {
     </div>
   );
 
-  // Show WebRTC video player when publishing is active (regardless of loaded state)
+  // Show WebRTC video player when publishing is active 
   if (isPublishing && omApiKey && omApiKeyId) {
     return (
       <>
