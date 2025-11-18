@@ -268,14 +268,15 @@ export function App() {
 
             // Handle avatar health check response
             if (response.request_id === healthCheckRequestIdRef.current) {
-              if (response.message === 'Avatar system active') {
+              if (response.code === 0 && response.status === 'active') {
                 console.log('Received avatar health check response:', response);
+                console.log('OM1 avatar system is active');
                 if (!loaded) {
                   setLoaded(true);
                   setCurrentAnimation('happy');
                 }
               } else {
-                console.warn('OM1 avatar health check failed:', response.message);
+                console.warn('OM1 avatar health check failed:', response);
               }
               
               // Clear health check timeout
