@@ -85,6 +85,7 @@ const ANIMATION_STATES = [
 type AnimationState = (typeof ANIMATION_STATES)[number];
 
 export function App() {
+  // State
   const [loaded, setLoaded] = useState(false);
   const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('happy');
   const [allModes, setAllModes] = useState<string[]>([]);
@@ -92,12 +93,26 @@ export function App() {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
+  
+  // WebSocket
   const apiWsRef = useRef<WebSocket | null>(null);
   const apiReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Intervals
   const apiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isPublishingRef = useRef<boolean>(false);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Timeouts
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const healthCheckTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  
+  // Health Check
+  const healthCheckRequestIdRef = useRef<string | null>(null);
+  
+  // State sync 
+  const loadedRef = useRef<boolean>(false);
+  const isPublishingRef = useRef<boolean>(false);
 
   // WebSocket Message Handlers
   // Avatar Face
@@ -205,6 +220,28 @@ export function App() {
   };
 
   useEffect(() => {
+    const sendHealthCheck = (ws: WebSocket) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        const avatarRequestId = crypto.randomUUID();
+        healthCheckRequestIdRef.current = avatarRequestId;
+        const healthCheckRequest = JSON.stringify({ 
+          action: "get_avatar_status", 
+          request_id: avatarRequestId 
+        });
+        ws.send(healthCheckRequest);
+        console.log('Sent avatar health check request:', healthCheckRequest);
+        
+        const timeoutId = setTimeout(() => {
+          console.error('OM1 health check timeout');
+          loadedRef.current = false;
+          setLoaded(false);
+          healthCheckTimeoutsRef.current.delete(avatarRequestId);
+        }, 5000);
+        
+        healthCheckTimeoutsRef.current.set(avatarRequestId, timeoutId);
+      }
+    };
+
     const connectApiWebSocket = () => {
       try {
         const apiWs = new WebSocket(apiWsUrl);
@@ -212,9 +249,15 @@ export function App() {
 
         apiWs.onopen = () => {
           console.log(`API WebSocket connected to ${apiWsUrl}`);
-          setLoaded(true);
-          setCurrentAnimation('happy');
-
+          
+          // Send initial avatar health check request
+          sendHealthCheck(apiWs);
+          
+          // Start periodic checking
+          healthCheckIntervalRef.current = setInterval(() => {
+            sendHealthCheck(apiWs);
+          }, 2000);
+          
           const requestId = crypto.randomUUID();
           const initMessage = JSON.stringify({ action: "get_mode", request_id: requestId });
           apiWs.send(initMessage);
@@ -247,6 +290,41 @@ export function App() {
               return;
             }
 
+            // Handle avatar health check response
+            if (response.request_id === healthCheckRequestIdRef.current) {
+              if (response.code === 0 && response.status === 'active') {
+                console.log('Avatar health check success:', response);
+                
+                // Clear previous timeouts 
+                healthCheckTimeoutsRef.current.forEach((timeoutId) => {
+                  clearTimeout(timeoutId);
+                });
+                healthCheckTimeoutsRef.current.clear();
+                
+                if (!loadedRef.current) {
+                  console.log('OM1 avatar system is active');
+                  loadedRef.current = true;
+                  setLoaded(true);
+                  setCurrentAnimation('happy');
+                }
+              } else {
+                console.warn('Avatar health check failed:', response);
+                
+                // If False: clear timeout in this session
+                const timeoutId = healthCheckTimeoutsRef.current.get(response.request_id);
+                if (timeoutId) {
+                  clearTimeout(timeoutId);
+                  healthCheckTimeoutsRef.current.delete(response.request_id);
+                }
+                
+                loadedRef.current = false;
+                setLoaded(false);
+              }
+              
+              healthCheckRequestIdRef.current = null;
+              return;
+            }
+
             if (response.code === 0 && response.message && response.message.includes("Successfully switched to mode")) {
               handleModeSwitchSuccess();
               return;
@@ -262,6 +340,7 @@ export function App() {
 
         apiWs.onclose = (event) => {
           console.log('API WebSocket connection closed:', event.code, event.reason);
+          loadedRef.current = false;
           setLoaded(false);
           setCurrentAnimation('happy');
 
@@ -269,6 +348,20 @@ export function App() {
             clearInterval(apiIntervalRef.current);
             apiIntervalRef.current = null;
           }
+          
+          if (healthCheckIntervalRef.current) {
+            clearInterval(healthCheckIntervalRef.current);
+            healthCheckIntervalRef.current = null;
+            console.log('Stopped avatar health check');
+          }
+          
+          // Clear all timeouts when ws is closed
+          healthCheckTimeoutsRef.current.forEach((timeoutId) => {
+            clearTimeout(timeoutId);
+          });
+          healthCheckTimeoutsRef.current.clear();
+          
+          healthCheckRequestIdRef.current = null;
 
           apiReconnectTimeoutRef.current = setTimeout(() => {
             console.log('Attempting to reconnect API WebSocket...');
@@ -305,6 +398,13 @@ export function App() {
       if (asrTextTimeoutRef.current) {
         clearTimeout(asrTextTimeoutRef.current);
       }
+      healthCheckTimeoutsRef.current.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      healthCheckTimeoutsRef.current.clear();
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
       if (apiIntervalRef.current) {
         clearInterval(apiIntervalRef.current);
       }
@@ -316,11 +416,6 @@ export function App() {
       }
     };
   }, []);
-
-  // Sync isPublishing state to ref
-  useEffect(() => {
-    isPublishingRef.current = isPublishing;
-  }, [isPublishing]);
 
   // Separate effect to handle interval timing changes based on mode
   useEffect(() => {
@@ -394,7 +489,7 @@ export function App() {
     </div>
   );
 
-  // Show WebRTC video player when publishing is active (regardless of loaded state)
+  // Show WebRTC video player when publishing is active 
   if (isPublishing && omApiKey && omApiKeyId) {
     return (
       <>
