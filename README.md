@@ -70,7 +70,7 @@ Add the script to `/etc/systemd/system/kiosk.service` to launch the kiosk mode a
 # /etc/systemd/system/kiosk.service
 [Unit]
 Description=Kiosk Browser
-After=graphical.target docker.service
+After=docker.service
 Requires=docker.service
 
 [Service]
