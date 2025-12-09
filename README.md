@@ -107,8 +107,8 @@ set -e
 
 sleep 5
 
-# First, set the master source volume to 100%
-pactl set-source-volume "alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" 65536
+# First, set the master source volume to 200%
+pactl set-source-volume "alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" 131072
 pactl set-source-mute "alsa_input.usb-R__DE_R__DE_VideoMic_GO_II_FEB0C614-00.mono-fallback" 0
 
 # Unload then load AEC module
@@ -133,15 +133,15 @@ pactl set-default-sink default_output_aec
 # Retry volume setting until device appears and volume is set correctly
 for i in {1..15}; do
   if pactl list short sources | grep -q default_mic_aec; then
-    # Set volume to 100% (65536)
-    pactl set-source-volume default_mic_aec 65536
+    # Set volume to 200% (131072)
+    pactl set-source-volume default_mic_aec 131072
     pactl set-source-mute default_mic_aec 0
 
     # Verify the volume was set
     CURRENT_VOL=$(pactl list sources | grep -A 7 "Name: default_mic_aec" | grep "Volume:" | awk '{print $3}')
 
-    if [ "$CURRENT_VOL" = "65536" ]; then
-      echo "Microphone volume successfully set to 100%"
+    if [ "$CURRENT_VOL" = "131072" ]; then
+      echo "Microphone volume successfully set to 200%"
       break
     else
       echo "Volume is $CURRENT_VOL, retrying... ($i/15)"
