@@ -93,23 +93,23 @@ export function App() {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
-  
+
   // WebSocket
   const apiWsRef = useRef<WebSocket | null>(null);
   const apiReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Intervals
   const apiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const publishCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Timeouts
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const healthCheckTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  
+
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
-  
+
   // State sync 
   const loadedRef = useRef<boolean>(false);
   const isPublishingRef = useRef<boolean>(false);
@@ -118,7 +118,7 @@ export function App() {
   // Avatar Face
   const handleAvatarMessage = (face: string) => {
     const normalizedFace = face.toLowerCase() as AnimationState;
-    
+
     if (ANIMATION_STATES.includes(normalizedFace)) {
       console.log('Avatar face received:', face, '-> Setting animation to:', normalizedFace);
       setCurrentAnimation(normalizedFace);
@@ -131,11 +131,11 @@ export function App() {
   const handleAsrMessage = (text: string) => {
     console.log('ASR subtitle received:', text);
     setAsrText(text);
-    
+
     if (asrTextTimeoutRef.current) {
       clearTimeout(asrTextTimeoutRef.current);
     }
-    
+
     asrTextTimeoutRef.current = setTimeout(() => {
       setAsrText('');
     }, 5000);
@@ -177,7 +177,7 @@ export function App() {
     if (apiWsRef.current && apiWsRef.current.readyState === WebSocket.OPEN) {
       const requestId = crypto.randomUUID();
       const message = JSON.stringify({
-        action: "swicth_mode",
+        action: "switch_mode",
         request_id: requestId,
         parameters: mode
       });
@@ -224,20 +224,20 @@ export function App() {
       if (ws.readyState === WebSocket.OPEN) {
         const avatarRequestId = crypto.randomUUID();
         healthCheckRequestIdRef.current = avatarRequestId;
-        const healthCheckRequest = JSON.stringify({ 
-          action: "get_avatar_status", 
-          request_id: avatarRequestId 
+        const healthCheckRequest = JSON.stringify({
+          action: "get_avatar_status",
+          request_id: avatarRequestId
         });
         ws.send(healthCheckRequest);
         console.log('Sent avatar health check request:', healthCheckRequest);
-        
+
         const timeoutId = setTimeout(() => {
           console.error('OM1 health check timeout');
           loadedRef.current = false;
           setLoaded(false);
           healthCheckTimeoutsRef.current.delete(avatarRequestId);
         }, 5000);
-        
+
         healthCheckTimeoutsRef.current.set(avatarRequestId, timeoutId);
       }
     };
@@ -249,15 +249,15 @@ export function App() {
 
         apiWs.onopen = () => {
           console.log(`API WebSocket connected to ${apiWsUrl}`);
-          
+
           // Send initial avatar health check request
           sendHealthCheck(apiWs);
-          
+
           // Start periodic checking
           healthCheckIntervalRef.current = setInterval(() => {
             sendHealthCheck(apiWs);
           }, 2000);
-          
+
           const requestId = crypto.randomUUID();
           const initMessage = JSON.stringify({ action: "get_mode", request_id: requestId });
           apiWs.send(initMessage);
@@ -294,13 +294,13 @@ export function App() {
             if (response.request_id === healthCheckRequestIdRef.current) {
               if (response.code === 0 && response.status === 'active') {
                 console.log('Avatar health check success:', response);
-                
+
                 // Clear previous timeouts 
                 healthCheckTimeoutsRef.current.forEach((timeoutId) => {
                   clearTimeout(timeoutId);
                 });
                 healthCheckTimeoutsRef.current.clear();
-                
+
                 if (!loadedRef.current) {
                   console.log('OM1 avatar system is active');
                   loadedRef.current = true;
@@ -309,18 +309,18 @@ export function App() {
                 }
               } else {
                 console.warn('Avatar health check failed:', response);
-                
+
                 // If False: clear timeout in this session
                 const timeoutId = healthCheckTimeoutsRef.current.get(response.request_id);
                 if (timeoutId) {
                   clearTimeout(timeoutId);
                   healthCheckTimeoutsRef.current.delete(response.request_id);
                 }
-                
+
                 loadedRef.current = false;
                 setLoaded(false);
               }
-              
+
               healthCheckRequestIdRef.current = null;
               return;
             }
@@ -348,19 +348,19 @@ export function App() {
             clearInterval(apiIntervalRef.current);
             apiIntervalRef.current = null;
           }
-          
+
           if (healthCheckIntervalRef.current) {
             clearInterval(healthCheckIntervalRef.current);
             healthCheckIntervalRef.current = null;
             console.log('Stopped avatar health check');
           }
-          
+
           // Clear all timeouts when ws is closed
           healthCheckTimeoutsRef.current.forEach((timeoutId) => {
             clearTimeout(timeoutId);
           });
           healthCheckTimeoutsRef.current.clear();
-          
+
           healthCheckRequestIdRef.current = null;
 
           apiReconnectTimeoutRef.current = setTimeout(() => {
@@ -462,7 +462,7 @@ export function App() {
           className="bg-gray-800 bg-opacity-80 backdrop-blur-sm border border-gray-800 rounded-lg px-4 py-2 text-green-300 text-sm font-medium hover:bg-opacity-90 transition-all duration-200 shadow-lg"
         >
           <div className="flex items-center justify-center space-x-2">
-            <div className="w-2 h-2 rounded-full bg-green-300"/>
+            <div className="w-2 h-2 rounded-full bg-green-300" />
             <span>{currentMode ? `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Mode` : 'Loading...'} ▼</span>
           </div>
         </button>
@@ -476,9 +476,8 @@ export function App() {
                 className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-600 hover:bg-opacity-50 transition-colors duration-150 first:rounded-t-lg last:rounded-b-lg"
               >
                 <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    mode === currentMode ? 'bg-green-300' : 'bg-gray-500'
-                  }`}></div>
+                  <div className={`w-2 h-2 rounded-full ${mode === currentMode ? 'bg-green-300' : 'bg-gray-500'
+                    }`}></div>
                   <span className={`${mode === currentMode ? 'text-green-300' : 'text-gray-500'}`}>{mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</span>
                 </div>
               </button>
