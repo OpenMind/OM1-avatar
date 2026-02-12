@@ -43,8 +43,8 @@ export function Subtitles({ text }: SubtitlesProps) {
 
   return (
     <div className="fixed bottom-8 left-0 right-0 flex justify-center z-40 pointer-events-none px-4 transition-all duration-300">
-      <div className="bg-black/40 backdrop-blur-md rounded-2xl px-6 py-3 shadow-2xl border border-white/10 max-w-3xl transition-all duration-300">
-        <p className="text-white text-center text-lg md:text-xl font-medium leading-relaxed tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      <div className="bg-gray-700/85 backdrop-blur-md rounded-2xl px-8 py-4 shadow-2xl border border-gray-500/30 max-w-4xl transition-all duration-300">
+        <p className="text-white text-center text-2xl md:text-3xl font-medium leading-relaxed tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
           {displayedText}
         </p>
       </div>
