@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
 import { WebRTCVideoStream } from './components/WebRTCVideoStream';
 import { Subtitles } from './components/Subtitles';
+import { CountdownTimer } from './components/CountdownTimer';
 import { getEnvVar } from './utils/env';
 
 import ThinkAnimation from './animations/face/Think.riv';
@@ -93,6 +94,7 @@ export function App() {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
 
   // WebSocket
   const apiWsRef = useRef<WebSocket | null>(null);
@@ -106,6 +108,9 @@ export function App() {
   // Timeouts
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const healthCheckTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownSecondsRef = useRef<number | null>(null);
+  const countdownDismissRef = useRef<NodeJS.Timeout | null>(null);
 
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
@@ -140,6 +145,60 @@ export function App() {
       setAsrText('');
     }, 5000);
   };
+
+  // Person Greeting Status Countdown
+  const handleCountdownMessage = (value: number) => {
+    let targetSeconds: number;
+    if (value === 20) {
+      targetSeconds = 20;
+    } else if (value === 10) {
+      targetSeconds = 10;
+    } else {
+      targetSeconds = 0;
+    }
+    if (targetSeconds === 0 && (countdownDismissRef.current || countdownSecondsRef.current === null)) {
+      return;
+    }
+
+    countdownSecondsRef.current = targetSeconds;
+    setCountdownSeconds(targetSeconds);
+
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    if (targetSeconds > 0) {
+      if (countdownDismissRef.current) {
+        clearTimeout(countdownDismissRef.current);
+        countdownDismissRef.current = null;
+      }
+      countdownIntervalRef.current = setInterval(() => {
+        if (countdownSecondsRef.current !== null && countdownSecondsRef.current > 0) {
+          countdownSecondsRef.current -= 1;
+          setCountdownSeconds(countdownSecondsRef.current);
+          if (countdownSecondsRef.current === 0) {
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            countdownDismissRef.current = setTimeout(() => {
+              setCountdownSeconds(null);
+              countdownSecondsRef.current = null;
+              countdownDismissRef.current = null;
+            }, 5000);
+          }
+        }
+      }, 1000);
+    } else {
+      countdownDismissRef.current = setTimeout(() => {
+        setCountdownSeconds(null);
+        countdownSecondsRef.current = null;
+        countdownDismissRef.current = null;
+      }, 5000);
+    }
+  };
+
   // Mode
   const handleModeResponse = (message: string) => {
     try {
@@ -290,6 +349,11 @@ export function App() {
               return;
             }
 
+            if (response.type === 'person_greeting_status' && typeof response.value === 'number') {
+              handleCountdownMessage(response.value);
+              return;
+            }
+
             // Handle avatar health check response
             if (response.request_id === healthCheckRequestIdRef.current) {
               if (response.code === 0 && response.status === 'active') {
@@ -402,6 +466,12 @@ export function App() {
         clearTimeout(timeoutId);
       });
       healthCheckTimeoutsRef.current.clear();
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+      if (countdownDismissRef.current) {
+        clearTimeout(countdownDismissRef.current);
+      }
       if (healthCheckIntervalRef.current) {
         clearInterval(healthCheckIntervalRef.current);
       }
@@ -509,6 +579,7 @@ export function App() {
       <>
         <ModeSelector />
         <Loading />
+        <CountdownTimer remainingSeconds={countdownSeconds} />
         <Subtitles text={asrText} />
       </>
     )
@@ -519,6 +590,7 @@ export function App() {
     <>
       {renderCurrentAnimation()}
       <ModeSelector />
+      <CountdownTimer remainingSeconds={countdownSeconds} />
       <Subtitles text={asrText} />
     </>
   );
