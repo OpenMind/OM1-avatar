@@ -156,6 +156,9 @@ export function App() {
     } else {
       targetSeconds = 0;
     }
+    if (targetSeconds === 0 && (countdownDismissRef.current || countdownSecondsRef.current === null)) {
+      return;
+    }
 
     countdownSecondsRef.current = targetSeconds;
     setCountdownSeconds(targetSeconds);
@@ -188,7 +191,6 @@ export function App() {
         }
       }, 1000);
     } else {
-      if (countdownDismissRef.current) return;
       countdownDismissRef.current = setTimeout(() => {
         setCountdownSeconds(null);
         countdownSecondsRef.current = null;
@@ -577,6 +579,7 @@ export function App() {
       <>
         <ModeSelector />
         <Loading />
+        <CountdownTimer remainingSeconds={countdownSeconds} />
         <Subtitles text={asrText} />
       </>
     )
