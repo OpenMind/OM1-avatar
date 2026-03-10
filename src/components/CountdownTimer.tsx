@@ -3,7 +3,7 @@ interface CountdownTimerProps {
 }
 
 const TOTAL_SECONDS = 20;
-const RADIUS = 52;
+const RADIUS = 38;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function getColor(seconds: number): string {
@@ -22,11 +22,11 @@ export function CountdownTimer({ remainingSeconds }: CountdownTimerProps) {
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
-      <svg width="128" height="128" viewBox="0 0 128 128">
+      <svg width="96" height="96" viewBox="0 0 96 96">
         {/* Background ring */}
         <circle
-          cx="64"
-          cy="64"
+          cx="48"
+          cy="48"
           r={RADIUS}
           fill="none"
           stroke="rgba(255,255,255,0.1)"
@@ -34,8 +34,8 @@ export function CountdownTimer({ remainingSeconds }: CountdownTimerProps) {
         />
         {/* Progress ring */}
         <circle
-          cx="64"
-          cy="64"
+          cx="48"
+          cy="48"
           r={RADIUS}
           fill="none"
           stroke={color}
@@ -51,12 +51,12 @@ export function CountdownTimer({ remainingSeconds }: CountdownTimerProps) {
         />
         {/* Center text */}
         <text
-          x="64"
-          y="64"
+          x="48"
+          y="48"
           textAnchor="middle"
           dominantBaseline="central"
           fill={color}
-          fontSize="40"
+          fontSize="28"
           fontWeight="bold"
           fontFamily="monospace"
           style={{ transition: 'fill 0.3s ease' }}
