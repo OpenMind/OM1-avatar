@@ -21,7 +21,7 @@ export function CountdownTimer({ remainingSeconds }: CountdownTimerProps) {
   const color = getColor(clamped);
 
   return (
-    <div className="fixed top-4 right-48 z-50">
+    <div className="fixed bottom-4 right-4 z-50">
       <svg width="128" height="128" viewBox="0 0 128 128">
         {/* Background ring */}
         <circle
