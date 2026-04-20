@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.org';
+const webrtcPlayerBaseUrl = 'https://api-video-webrtc.openmind.com';
 
 // WebRTC Reader Config
 interface WebRTCReaderConfig {

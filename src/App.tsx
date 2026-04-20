@@ -15,7 +15,7 @@ import loadingAnimation from './animations/openmind-logo.riv';
 const apiWsUrl = getEnvVar('VITE_API_WEBSOCKET_URL', 'ws://localhost:6123');
 const omApiKey = getEnvVar('VITE_OM_API_KEY');
 const omApiKeyId = getEnvVar('VITE_OM_API_KEY_ID');
-const publishStatusApiUrl = 'https://api.openmind.org/api/core/teleops/video/publish/status';
+const publishStatusApiUrl = 'https://api.openmind.com/api/core/teleops/video/publish/status';
 const publishStatusCheckInterval = 5000;
 
 function Loading() {
