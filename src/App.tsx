@@ -114,6 +114,7 @@ export function App() {
 
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
+  const healthCheckFailCountRef = useRef<number>(0);
 
   // State sync 
   const loadedRef = useRef<boolean>(false);
@@ -297,9 +298,12 @@ export function App() {
 
         const timeoutId = setTimeout(() => {
           console.error('OM1 health check timeout');
-          loadedRef.current = false;
-          setLoaded(false);
           healthCheckTimeoutsRef.current.delete(avatarRequestId);
+          healthCheckFailCountRef.current += 1;
+          if (healthCheckFailCountRef.current >= 3) {
+            loadedRef.current = false;
+            setLoaded(false);
+          }
         }, 5000);
 
         healthCheckTimeoutsRef.current.set(avatarRequestId, timeoutId);
@@ -369,6 +373,7 @@ export function App() {
                   clearTimeout(timeoutId);
                 });
                 healthCheckTimeoutsRef.current.clear();
+                healthCheckFailCountRef.current = 0;
 
                 if (!loadedRef.current) {
                   console.log('OM1 avatar system is active');
@@ -386,8 +391,11 @@ export function App() {
                   healthCheckTimeoutsRef.current.delete(response.request_id);
                 }
 
-                loadedRef.current = false;
-                setLoaded(false);
+                healthCheckFailCountRef.current += 1;
+                if (healthCheckFailCountRef.current >= 3) {
+                  loadedRef.current = false;
+                  setLoaded(false);
+                }
               }
 
               healthCheckRequestIdRef.current = null;
