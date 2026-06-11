@@ -107,14 +107,13 @@ export function App() {
 
   // Timeouts
   const asrTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const healthCheckTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const healthCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownSecondsRef = useRef<number | null>(null);
   const countdownDismissRef = useRef<NodeJS.Timeout | null>(null);
 
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
-  const healthCheckFailCountRef = useRef<number>(0);
 
   // State sync 
   const loadedRef = useRef<boolean>(false);
@@ -282,10 +281,9 @@ export function App() {
   useEffect(() => {
     const sendHealthCheck = (ws: WebSocket) => {
       if (ws.readyState === WebSocket.OPEN) {
-        healthCheckTimeoutsRef.current.forEach((timeoutId) => {
-          clearTimeout(timeoutId);
-        });
-        healthCheckTimeoutsRef.current.clear();
+        if (healthCheckTimeoutRef.current) {
+          clearTimeout(healthCheckTimeoutRef.current);
+        }
 
         const avatarRequestId = crypto.randomUUID();
         healthCheckRequestIdRef.current = avatarRequestId;
@@ -296,17 +294,12 @@ export function App() {
         ws.send(healthCheckRequest);
         console.log('Sent avatar health check request:', healthCheckRequest);
 
-        const timeoutId = setTimeout(() => {
+        healthCheckTimeoutRef.current = setTimeout(() => {
           console.error('OM1 health check timeout');
-          healthCheckTimeoutsRef.current.delete(avatarRequestId);
-          healthCheckFailCountRef.current += 1;
-          if (healthCheckFailCountRef.current >= 3) {
-            loadedRef.current = false;
-            setLoaded(false);
-          }
+          healthCheckTimeoutRef.current = null;
+          loadedRef.current = false;
+          setLoaded(false);
         }, 5000);
-
-        healthCheckTimeoutsRef.current.set(avatarRequestId, timeoutId);
       }
     };
 
@@ -368,12 +361,10 @@ export function App() {
               if (response.code === 0 && response.status === 'active') {
                 console.log('Avatar health check success:', response);
 
-                // Clear previous timeouts 
-                healthCheckTimeoutsRef.current.forEach((timeoutId) => {
-                  clearTimeout(timeoutId);
-                });
-                healthCheckTimeoutsRef.current.clear();
-                healthCheckFailCountRef.current = 0;
+                if (healthCheckTimeoutRef.current) {
+                  clearTimeout(healthCheckTimeoutRef.current);
+                  healthCheckTimeoutRef.current = null;
+                }
 
                 if (!loadedRef.current) {
                   console.log('OM1 avatar system is active');
@@ -384,18 +375,13 @@ export function App() {
               } else {
                 console.warn('Avatar health check failed:', response);
 
-                // If False: clear timeout in this session
-                const timeoutId = healthCheckTimeoutsRef.current.get(response.request_id);
-                if (timeoutId) {
-                  clearTimeout(timeoutId);
-                  healthCheckTimeoutsRef.current.delete(response.request_id);
+                if (healthCheckTimeoutRef.current) {
+                  clearTimeout(healthCheckTimeoutRef.current);
+                  healthCheckTimeoutRef.current = null;
                 }
 
-                healthCheckFailCountRef.current += 1;
-                if (healthCheckFailCountRef.current >= 3) {
-                  loadedRef.current = false;
-                  setLoaded(false);
-                }
+                loadedRef.current = false;
+                setLoaded(false);
               }
 
               healthCheckRequestIdRef.current = null;
@@ -432,11 +418,10 @@ export function App() {
             console.log('Stopped avatar health check');
           }
 
-          // Clear all timeouts when ws is closed
-          healthCheckTimeoutsRef.current.forEach((timeoutId) => {
-            clearTimeout(timeoutId);
-          });
-          healthCheckTimeoutsRef.current.clear();
+          if (healthCheckTimeoutRef.current) {
+            clearTimeout(healthCheckTimeoutRef.current);
+            healthCheckTimeoutRef.current = null;
+          }
 
           healthCheckRequestIdRef.current = null;
 
@@ -475,10 +460,9 @@ export function App() {
       if (asrTextTimeoutRef.current) {
         clearTimeout(asrTextTimeoutRef.current);
       }
-      healthCheckTimeoutsRef.current.forEach((timeoutId) => {
-        clearTimeout(timeoutId);
-      });
-      healthCheckTimeoutsRef.current.clear();
+      if (healthCheckTimeoutRef.current) {
+        clearTimeout(healthCheckTimeoutRef.current);
+      }
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current);
       }
