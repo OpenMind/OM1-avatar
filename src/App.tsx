@@ -143,7 +143,7 @@ export function App() {
 
     asrTextTimeoutRef.current = setTimeout(() => {
       setAsrText('');
-    }, 5000);
+    }, 2500);
   };
 
   // Person Greeting Status Countdown
@@ -281,6 +281,11 @@ export function App() {
   useEffect(() => {
     const sendHealthCheck = (ws: WebSocket) => {
       if (ws.readyState === WebSocket.OPEN) {
+        healthCheckTimeoutsRef.current.forEach((timeoutId) => {
+          clearTimeout(timeoutId);
+        });
+        healthCheckTimeoutsRef.current.clear();
+
         const avatarRequestId = crypto.randomUUID();
         healthCheckRequestIdRef.current = avatarRequestId;
         const healthCheckRequest = JSON.stringify({
