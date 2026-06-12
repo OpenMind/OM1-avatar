@@ -403,8 +403,6 @@ export function App() {
 
         apiWs.onclose = (event) => {
           console.log('API WebSocket connection closed:', event.code, event.reason);
-          loadedRef.current = false;
-          setLoaded(false);
           setCurrentAnimation('happy');
 
           if (apiIntervalRef.current) {
