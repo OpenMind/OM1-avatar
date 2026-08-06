@@ -3,7 +3,17 @@ import Rive from '@rive-app/react-canvas';
 import { WebRTCVideoStream } from './components/WebRTCVideoStream';
 import { Subtitles } from './components/Subtitles';
 import { CountdownTimer } from './components/CountdownTimer';
+import { SystemStatusHUD } from './components/SystemStatusHUD';
+import { ActivityIndicator } from './components/ActivityIndicator';
 import { getEnvVar } from './utils/env';
+import {
+  isActivityStatus,
+  isSystemStatus,
+  normalizeActivityStatus,
+  normalizeSystemStatus,
+  staleStatus,
+} from './utils/status';
+import type { ActivityStatus, NormalizedStatus, SystemStatus } from './utils/status';
 
 import ThinkAnimation from './animations/face/Think.riv';
 import ConfusedAnimation from './animations/face/Confused.riv';
@@ -17,6 +27,10 @@ const omApiKey = getEnvVar('VITE_OM_API_KEY');
 const omApiKeyId = getEnvVar('VITE_OM_API_KEY_ID');
 const publishStatusApiUrl = 'https://api.openmind.com/api/core/teleops/video/publish/status';
 const publishStatusCheckInterval = 5000;
+const showSystemStatus = ['true', '1'].includes(getEnvVar('VITE_SHOW_SYSTEM_STATUS').toLowerCase());
+const systemStatusStaleTimeout = 3000;
+const showActivityState = ['true', '1'].includes(getEnvVar('VITE_SHOW_ACTIVITY_STATE').toLowerCase());
+const activityStaleTimeout = 5000;
 
 function Loading() {
   return (
@@ -95,6 +109,11 @@ export function App() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+  const [systemStatus, setSystemStatus] = useState<NormalizedStatus | null>(null);
+  const [systemStatusStale, setSystemStatusStale] = useState(true);
+  const [activity, setActivity] = useState<ActivityStatus | null>(null);
+  const [activityStale, setActivityStale] = useState(true);
+  const [activitySupported, setActivitySupported] = useState(showActivityState);
 
   // WebSocket
   const apiWsRef = useRef<WebSocket | null>(null);
@@ -111,6 +130,8 @@ export function App() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownSecondsRef = useRef<number | null>(null);
   const countdownDismissRef = useRef<NodeJS.Timeout | null>(null);
+  const systemStatusStaleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const activityStaleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
@@ -144,6 +165,38 @@ export function App() {
     asrTextTimeoutRef.current = setTimeout(() => {
       setAsrText('');
     }, 5000);
+  };
+
+  const handleSystemStatusMessage = (status: SystemStatus) => {
+    setSystemStatus(normalizeSystemStatus(status));
+    setSystemStatusStale(false);
+
+    if (systemStatusStaleTimeoutRef.current) {
+      clearTimeout(systemStatusStaleTimeoutRef.current);
+    }
+
+    systemStatusStaleTimeoutRef.current = setTimeout(() => {
+      console.warn(`No system_status for ${systemStatusStaleTimeout}ms, marking subsystems unknown`);
+      setSystemStatus((previous) => staleStatus(previous?.ts ?? 0));
+      setSystemStatusStale(true);
+      systemStatusStaleTimeoutRef.current = null;
+    }, systemStatusStaleTimeout);
+  };
+
+  const handleActivityStateMessage = (frame: Record<string, unknown>) => {
+    setActivity(normalizeActivityStatus(frame));
+    setActivityStale(false);
+    setActivitySupported(true);
+
+    if (activityStaleTimeoutRef.current) {
+      clearTimeout(activityStaleTimeoutRef.current);
+    }
+
+    activityStaleTimeoutRef.current = setTimeout(() => {
+      console.warn(`No activity_state for ${activityStaleTimeout}ms, clearing activity lamps`);
+      setActivityStale(true);
+      activityStaleTimeoutRef.current = null;
+    }, activityStaleTimeout);
   };
 
   // Person Greeting Status Countdown
@@ -354,6 +407,24 @@ export function App() {
               return;
             }
 
+            if (response.type === 'activity_state') {
+              if (isActivityStatus(response)) {
+                handleActivityStateMessage(response);
+              } else {
+                console.warn('Malformed activity_state frame, ignoring:', response);
+              }
+              return;
+            }
+
+            if (response.type === 'system_status') {
+              if (isSystemStatus(response)) {
+                handleSystemStatusMessage(response);
+              } else {
+                console.warn('Malformed system_status frame, ignoring:', response);
+              }
+              return;
+            }
+
             // Handle avatar health check response
             if (response.request_id === healthCheckRequestIdRef.current) {
               if (response.code === 0 && response.status === 'active') {
@@ -407,6 +478,20 @@ export function App() {
           loadedRef.current = false;
           setLoaded(false);
           setCurrentAnimation('happy');
+
+          if (systemStatusStaleTimeoutRef.current) {
+            clearTimeout(systemStatusStaleTimeoutRef.current);
+            systemStatusStaleTimeoutRef.current = null;
+          }
+          setSystemStatus(null);
+          setSystemStatusStale(true);
+
+          if (activityStaleTimeoutRef.current) {
+            clearTimeout(activityStaleTimeoutRef.current);
+            activityStaleTimeoutRef.current = null;
+          }
+          setActivity(null);
+          setActivityStale(true);
 
           if (apiIntervalRef.current) {
             clearInterval(apiIntervalRef.current);
@@ -471,6 +556,12 @@ export function App() {
       }
       if (countdownDismissRef.current) {
         clearTimeout(countdownDismissRef.current);
+      }
+      if (systemStatusStaleTimeoutRef.current) {
+        clearTimeout(systemStatusStaleTimeoutRef.current);
+      }
+      if (activityStaleTimeoutRef.current) {
+        clearTimeout(activityStaleTimeoutRef.current);
       }
       if (healthCheckIntervalRef.current) {
         clearInterval(healthCheckIntervalRef.current);
@@ -558,7 +649,19 @@ export function App() {
     </div>
   );
 
-  // Show WebRTC video player when publishing is active 
+  const systemStatusHud = showSystemStatus ? (
+    <SystemStatusHUD status={systemStatus} stale={systemStatusStale} />
+  ) : null;
+
+  const activityIndicator = activitySupported ? (
+    <ActivityIndicator
+      state={activity?.state ?? null}
+      detail={activity?.detail}
+      stale={activityStale}
+    />
+  ) : null;
+
+  // Show WebRTC video player when publishing is active
   if (isPublishing && omApiKey && omApiKeyId) {
     return (
       <>
@@ -568,6 +671,8 @@ export function App() {
           isPublishing={isPublishing}
         />
         <ModeSelector />
+        {systemStatusHud}
+        {activityIndicator}
         <Subtitles text={asrText} />
       </>
     );
@@ -578,6 +683,8 @@ export function App() {
     return (
       <>
         <ModeSelector />
+        {systemStatusHud}
+        {activityIndicator}
         <Loading />
         <CountdownTimer remainingSeconds={countdownSeconds} />
         <Subtitles text={asrText} />
@@ -590,6 +697,8 @@ export function App() {
     <>
       {renderCurrentAnimation()}
       <ModeSelector />
+      {systemStatusHud}
+      {activityIndicator}
       <CountdownTimer remainingSeconds={countdownSeconds} />
       <Subtitles text={asrText} />
     </>

@@ -1,1 +1,68 @@
 @import "tailwindcss";
+
+@keyframes heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.18);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.09);
+  }
+  56% {
+    transform: scale(1);
+  }
+}
+
+@keyframes activity-ripple {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes activity-wave {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes activity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.activity-ripple {
+  animation: activity-ripple 1.6s ease-in-out infinite;
+}
+
+.activity-wave {
+  animation: activity-wave 0.9s ease-in-out infinite;
+}
+
+.activity-spin {
+  animation: activity-spin 3.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-ripple,
+  .activity-wave,
+  .activity-spin {
+    animation: none;
+  }
+}

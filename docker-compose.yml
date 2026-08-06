@@ -10,6 +10,7 @@ services:
     environment:
       - VITE_OM_API_KEY=${OM_API_KEY}
       - VITE_OM_API_KEY_ID=${OM_API_KEY_ID}
+      - VITE_SHOW_SYSTEM_STATUS=${SHOW_SYSTEM_STATUS:-false}
     restart: unless-stopped
     network_mode: host
     ports:
