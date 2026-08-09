@@ -194,7 +194,14 @@ function WifiIcon({ subsystem, downlink }: IconProps & { downlink?: number }) {
   );
 }
 
-function CameraFpsIcon({ subsystem }: IconProps) {
+const CAMERA_BODY =
+  'M2.4 9a1.8 1.8 0 0 1 1.8-1.8h2.6l1.4-2.4h7.6l1.4 2.4h2.6A1.8 1.8 0 0 1 21.6 9v8.4a1.8 1.8 0 0 1-1.8 1.8H4.2a1.8 1.8 0 0 1-1.8-1.8Z';
+
+function CameraFpsIcon({
+  subsystem,
+  name,
+  variant,
+}: IconProps & { name: string; variant: 'depth' | 'rgb' }) {
   const state = subsystem?.state ?? 'unknown';
   const fps = isReporting(state) ? subsystem?.fps : undefined;
   const device = subsystem?.detail;
@@ -202,7 +209,7 @@ function CameraFpsIcon({ subsystem }: IconProps) {
   return (
     <IconCell
       state={state}
-      title={`camera: ${state}${device ? ` (${device})` : ''}${
+      title={`${name}: ${state}${device ? ` (${device})` : ''}${
         fps !== undefined ? ` — ${fps.toFixed(1)} fps` : ''
       }`}
       label={formatRate(fps, '')}
@@ -217,11 +224,16 @@ function CameraFpsIcon({ subsystem }: IconProps) {
         strokeLinecap="round"
         style={{ transition: 'stroke 0.3s ease' }}
       >
-        <path
-          d="M2.4 9a1.8 1.8 0 0 1 1.8-1.8h2.6l1.4-2.4h7.6l1.4 2.4h2.6A1.8 1.8 0 0 1 21.6 9v8.4a1.8 1.8 0 0 1-1.8 1.8H4.2a1.8 1.8 0 0 1-1.8-1.8Z"
-          strokeLinejoin="round"
-        />
-        <circle cx="12" cy="13.2" r="3.4" />
+        <path d={CAMERA_BODY} strokeLinejoin="round" />
+        {variant === 'depth' ? (
+          // Stereo pair — the D435i's two imagers, legible at 18px.
+          <>
+            <circle cx="8.6" cy="13.4" r="2.3" />
+            <circle cx="15.4" cy="13.4" r="2.3" />
+          </>
+        ) : (
+          <circle cx="12" cy="13.2" r="3.4" />
+        )}
       </svg>
     </IconCell>
   );
@@ -345,7 +357,8 @@ export function SystemStatusHUD({ status, stale }: SystemStatusHUDProps) {
 
         <div className="flex items-start gap-2.5">
           <WifiIcon subsystem={subsystems.wifi} downlink={downlink} />
-          <CameraFpsIcon subsystem={subsystems.camera} />
+          <CameraFpsIcon subsystem={subsystems.camera} name="depth camera" variant="depth" />
+          <CameraFpsIcon subsystem={subsystems.arducam} name="arducam" variant="rgb" />
           <LidarIcon subsystem={subsystems.lidar} />
           <SpeakerIcon subsystem={subsystems.speaker} />
         </div>

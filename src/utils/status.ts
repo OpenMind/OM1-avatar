@@ -4,7 +4,8 @@ export const SUBSYSTEM_STATES = ['ok', 'warn', 'down', 'unknown'] as const;
 
 export type SubsystemState = (typeof SUBSYSTEM_STATES)[number];
 
-export const SUBSYSTEM_KEYS = ['camera', 'lidar', 'mic', 'speaker', 'wifi'] as const;
+// `camera` is the depth camera (RealSense D435i); `arducam` is the RGB module.
+export const SUBSYSTEM_KEYS = ['camera', 'arducam', 'lidar', 'mic', 'speaker', 'wifi'] as const;
 
 export type SubsystemKey = (typeof SUBSYSTEM_KEYS)[number];
 
