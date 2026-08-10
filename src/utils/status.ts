@@ -131,6 +131,8 @@ export interface ActivityStatus {
   ts: number;
   state: ActivityState | null;
   detail?: string;
+  /** Measured TTS speaking rate in chars/sec, for subtitle pacing. */
+  ttsCps?: number;
 }
 
 const isActivityState = (value: unknown): value is ActivityState =>
@@ -148,6 +150,53 @@ export function normalizeActivityStatus(frame: Record<string, unknown>): Activit
     ts: typeof frame.ts === 'number' && Number.isFinite(frame.ts) ? frame.ts : 0,
     state: isActivityState(frame.state) ? frame.state : null,
     ...(typeof frame.detail === 'string' ? { detail: frame.detail } : {}),
+    ...(typeof frame.tts_cps === 'number' && Number.isFinite(frame.tts_cps) && frame.tts_cps > 0
+      ? { ttsCps: frame.tts_cps }
+      : {}),
+  };
+}
+
+export const COT_KINDS = ['heard', 'think', 'reply', 'action', 'speak', 'mode', 'flow'] as const;
+
+export type CotKind = (typeof COT_KINDS)[number];
+
+export interface CotEvent {
+  t: number;
+  kind: CotKind;
+  text: string;
+}
+
+export interface CotStatus {
+  type: 'cot';
+  ts: number;
+  vision: string;
+  events: CotEvent[];
+}
+
+export function isCotStatus(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && (value as Record<string, unknown>).type === 'cot';
+}
+
+export function normalizeCotStatus(frame: Record<string, unknown>): CotStatus {
+  const rawEvents = Array.isArray(frame.events) ? frame.events : [];
+  const events: CotEvent[] = [];
+
+  for (const raw of rawEvents) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const event = raw as Record<string, unknown>;
+    if (typeof event.text !== 'string' || !event.text) continue;
+    events.push({
+      t: typeof event.t === 'number' && Number.isFinite(event.t) ? event.t : 0,
+      kind: COT_KINDS.includes(event.kind as CotKind) ? (event.kind as CotKind) : 'think',
+      text: event.text,
+    });
+  }
+
+  return {
+    type: 'cot',
+    ts: typeof frame.ts === 'number' && Number.isFinite(frame.ts) ? frame.ts : 0,
+    vision: typeof frame.vision === 'string' ? frame.vision : '',
+    events,
   };
 }
 

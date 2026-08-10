@@ -4,7 +4,6 @@ import type { Activity, ActivityState } from '../utils/status';
 
 interface ActivityIndicatorProps {
   state: ActivityState | null;
-  detail?: string;
   stale: boolean;
 }
 
@@ -141,9 +140,8 @@ function ActivityRow({ activity, active }: { activity: Activity; active: boolean
   );
 }
 
-export function ActivityIndicator({ state, detail, stale }: ActivityIndicatorProps) {
+export function ActivityIndicator({ state, stale }: ActivityIndicatorProps) {
   const live = stale ? null : state;
-  const caption = stale ? 'no signal' : live === null || live === 'idle' ? 'idle' : detail;
 
   return (
     <div className="fixed top-1/2 right-4 z-50 -translate-y-1/2 pointer-events-none">
@@ -162,14 +160,6 @@ export function ActivityIndicator({ state, detail, stale }: ActivityIndicatorPro
         {ACTIVITIES.map((activity) => (
           <ActivityRow key={activity} activity={activity} active={live === activity} />
         ))}
-
-        <span
-          className="truncate px-2 pt-0.5 text-[9px] leading-none tracking-wide"
-          style={{ color: 'rgba(255,255,255,0.42)' }}
-          title={caption}
-        >
-          {caption || '\u00a0'}
-        </span>
       </div>
     </div>
   );

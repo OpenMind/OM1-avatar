@@ -1,19 +1,22 @@
 import { useEffect, useState, useRef } from 'react';
 import Rive from '@rive-app/react-canvas';
 import { WebRTCVideoStream } from './components/WebRTCVideoStream';
-import { Subtitles } from './components/Subtitles';
+import { Subtitles, usePacedSubtitle } from './components/Subtitles';
 import { CountdownTimer } from './components/CountdownTimer';
 import { SystemStatusHUD } from './components/SystemStatusHUD';
 import { ActivityIndicator } from './components/ActivityIndicator';
 import { getEnvVar } from './utils/env';
+import { CotWindow } from './components/CotWindow';
 import {
   isActivityStatus,
+  isCotStatus,
   isSystemStatus,
   normalizeActivityStatus,
+  normalizeCotStatus,
   normalizeSystemStatus,
   staleStatus,
 } from './utils/status';
-import type { ActivityStatus, NormalizedStatus, SystemStatus } from './utils/status';
+import type { ActivityStatus, CotStatus, NormalizedStatus, SystemStatus } from './utils/status';
 
 import ThinkAnimation from './animations/face/Think.riv';
 import ConfusedAnimation from './animations/face/Confused.riv';
@@ -114,6 +117,10 @@ export function App() {
   const [activity, setActivity] = useState<ActivityStatus | null>(null);
   const [activityStale, setActivityStale] = useState(true);
   const [activitySupported, setActivitySupported] = useState(showActivityState);
+  const [cot, setCot] = useState<CotStatus | null>(null);
+  const [cotStale, setCotStale] = useState(true);
+  const [speech, setSpeech] = useState({ text: '', run: 0, cps: 0 });
+  const wasSpeakingRef = useRef(false);
 
   // WebSocket
   const apiWsRef = useRef<WebSocket | null>(null);
@@ -132,6 +139,7 @@ export function App() {
   const countdownDismissRef = useRef<NodeJS.Timeout | null>(null);
   const systemStatusStaleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const activityStaleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cotStaleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Health Check
   const healthCheckRequestIdRef = useRef<string | null>(null);
@@ -196,6 +204,20 @@ export function App() {
       console.warn(`No activity_state for ${activityStaleTimeout}ms, clearing activity lamps`);
       setActivityStale(true);
       activityStaleTimeoutRef.current = null;
+    }, activityStaleTimeout);
+  };
+
+  const handleCotMessage = (frame: Record<string, unknown>) => {
+    setCot(normalizeCotStatus(frame));
+    setCotStale(false);
+
+    if (cotStaleTimeoutRef.current) {
+      clearTimeout(cotStaleTimeoutRef.current);
+    }
+
+    cotStaleTimeoutRef.current = setTimeout(() => {
+      setCotStale(true);
+      cotStaleTimeoutRef.current = null;
     }, activityStaleTimeout);
   };
 
@@ -416,6 +438,13 @@ export function App() {
               return;
             }
 
+            if (response.type === 'cot') {
+              if (isCotStatus(response)) {
+                handleCotMessage(response);
+              }
+              return;
+            }
+
             if (response.type === 'system_status') {
               if (isSystemStatus(response)) {
                 handleSystemStatusMessage(response);
@@ -493,6 +522,12 @@ export function App() {
           setActivity(null);
           setActivityStale(true);
 
+          if (cotStaleTimeoutRef.current) {
+            clearTimeout(cotStaleTimeoutRef.current);
+            cotStaleTimeoutRef.current = null;
+          }
+          setCotStale(true);
+
           if (apiIntervalRef.current) {
             clearInterval(apiIntervalRef.current);
             apiIntervalRef.current = null;
@@ -562,6 +597,9 @@ export function App() {
       }
       if (activityStaleTimeoutRef.current) {
         clearTimeout(activityStaleTimeoutRef.current);
+      }
+      if (cotStaleTimeoutRef.current) {
+        clearTimeout(cotStaleTimeoutRef.current);
       }
       if (healthCheckIntervalRef.current) {
         clearInterval(healthCheckIntervalRef.current);
@@ -654,12 +692,45 @@ export function App() {
   ) : null;
 
   const activityIndicator = activitySupported ? (
-    <ActivityIndicator
-      state={activity?.state ?? null}
-      detail={activity?.detail}
-      stale={activityStale}
-    />
+    <ActivityIndicator state={activity?.state ?? null} stale={activityStale} />
   ) : null;
+
+  // Live pipeline detail (heard speech, spoken reply) shown as one-line
+  // bottom-center subtitles; final ASR utterances fill the gaps. While the
+  // robot speaks, the subtitle steps through its sentence in time with speech
+  // and always plays the sentence out in full, even past the end of playback.
+  const activityDetail =
+    !activityStale && activity?.state && activity.state !== 'idle' ? activity.detail ?? '' : '';
+  const speakingActive = !activityStale && activity?.state === 'speaking';
+  const listeningActive = !activityStale && activity?.state === 'listening';
+
+  const activityTtsCps = activity?.ttsCps ?? 0;
+
+  useEffect(() => {
+    const started = speakingActive && !wasSpeakingRef.current;
+    wasSpeakingRef.current = speakingActive;
+    if (speakingActive && activityDetail) {
+      // Lock the measured TTS rate in at utterance start so pacing is stable.
+      setSpeech((previous) =>
+        started || activityDetail !== previous.text
+          ? { text: activityDetail, run: previous.run + 1, cps: activityTtsCps }
+          : previous,
+      );
+    }
+  }, [speakingActive, activityDetail, activityTtsCps]);
+
+  const { chunk: pacedSpeech, done: speechDone } = usePacedSubtitle(
+    speech.text,
+    speech.run,
+    speech.cps,
+  );
+  const subtitleText = listeningActive
+    ? activityDetail
+    : speakingActive || !speechDone
+      ? pacedSpeech
+      : activityDetail || asrText;
+
+  const cotWindow = <CotWindow cot={cot} stale={cotStale} />;
 
   // Show WebRTC video player when publishing is active
   if (isPublishing && omApiKey && omApiKeyId) {
@@ -673,7 +744,8 @@ export function App() {
         <ModeSelector />
         {systemStatusHud}
         {activityIndicator}
-        <Subtitles text={asrText} />
+        {cotWindow}
+        <Subtitles text={subtitleText} />
       </>
     );
   }
@@ -685,9 +757,10 @@ export function App() {
         <ModeSelector />
         {systemStatusHud}
         {activityIndicator}
+        {cotWindow}
         <Loading />
         <CountdownTimer remainingSeconds={countdownSeconds} />
-        <Subtitles text={asrText} />
+        <Subtitles text={subtitleText} />
       </>
     )
   }
@@ -699,8 +772,9 @@ export function App() {
       <ModeSelector />
       {systemStatusHud}
       {activityIndicator}
+      {cotWindow}
       <CountdownTimer remainingSeconds={countdownSeconds} />
-      <Subtitles text={asrText} />
+      <Subtitles text={subtitleText} />
     </>
   );
 }

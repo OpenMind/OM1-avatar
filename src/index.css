@@ -59,6 +59,27 @@
   animation: activity-spin 3.2s linear infinite;
 }
 
+@keyframes cot-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    max-height: 0;
+  }
+  60% {
+    max-height: 60px;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 60px;
+  }
+}
+
+.cot-enter {
+  animation: cot-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .activity-ripple,
   .activity-wave,
