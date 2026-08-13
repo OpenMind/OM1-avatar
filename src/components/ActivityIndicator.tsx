@@ -15,7 +15,7 @@ const ACTIVITY_COLORS: Record<Activity, string> = {
 
 const IDLE_COLOR = 'rgba(255,255,255,0.28)';
 
-const ICON_SIZE = 20;
+const ICON_SIZE = 28;
 
 interface IconProps {
   active: boolean;
@@ -115,7 +115,7 @@ function ActivityRow({ activity, active }: { activity: Activity; active: boolean
 
   return (
     <div
-      className="flex items-center gap-2.5 rounded-lg py-1.5 pr-2.5 pl-2"
+      className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-2.5"
       style={{
         background: active ? `${ACTIVITY_COLORS[activity]}22` : 'transparent',
         boxShadow: active ? `inset 0 0 0 1px ${ACTIVITY_COLORS[activity]}55` : 'none',
@@ -123,7 +123,7 @@ function ActivityRow({ activity, active }: { activity: Activity; active: boolean
       }}
     >
       <div
-        className="flex h-5 w-5 items-center justify-center"
+        className="flex h-7 w-7 items-center justify-center"
         style={{
           filter: active ? `drop-shadow(0 0 5px ${ACTIVITY_COLORS[activity]}88)` : 'none',
         }}
@@ -131,7 +131,7 @@ function ActivityRow({ activity, active }: { activity: Activity; active: boolean
         <Icon active={active} color={color} />
       </div>
       <span
-        className="text-[10px] font-semibold uppercase leading-none tracking-[0.14em]"
+        className="text-[14px] font-semibold uppercase leading-none tracking-[0.14em]"
         style={{ color, transition: 'color 0.25s ease' }}
       >
         {activity}
@@ -146,7 +146,7 @@ export function ActivityIndicator({ state, stale }: ActivityIndicatorProps) {
   return (
     <div className="fixed top-1/2 right-4 z-50 -translate-y-1/2 pointer-events-none">
       <div
-        className="pointer-events-auto flex w-[142px] flex-col gap-1 rounded-xl px-2 py-2"
+        className="pointer-events-auto flex w-[196px] flex-col gap-1.5 rounded-xl px-2.5 py-2.5"
         style={{
           background: 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
           backdropFilter: 'blur(20px) saturate(180%)',
