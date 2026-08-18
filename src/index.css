@@ -47,6 +47,18 @@
   }
 }
 
+@keyframes activity-arrow {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateX(-2px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(1px);
+  }
+}
+
 .activity-ripple {
   animation: activity-ripple 1.6s ease-in-out infinite;
 }
@@ -57,6 +69,11 @@
 
 .activity-spin {
   animation: activity-spin 3.2s linear infinite;
+}
+
+.activity-arrow {
+  opacity: 0.3;
+  animation: activity-arrow 0.8s ease-in-out 2;
 }
 
 @keyframes cot-enter {
@@ -80,10 +97,95 @@
   overflow: hidden;
 }
 
+/* Debug interface toggle (nose button). Panels keep their Tailwind v4
+   translate-* centering because these classes animate `transform`, which
+   composes with the native `translate` property. The visibility delay keeps
+   hidden panels unclickable only after the fade-out finishes. */
+.hud-anim {
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear;
+}
+
+.hud-hidden-up,
+.hud-hidden-left,
+.hud-hidden-right {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.45s;
+}
+
+.hud-hidden-up {
+  transform: translateY(-24px);
+}
+
+.hud-hidden-left {
+  transform: translateX(-24px);
+}
+
+.hud-hidden-right {
+  transform: translateX(24px);
+}
+
+/* Nose press feedback: springy overshoot pop plus an expanding ripple ring. */
+@keyframes nose-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.78);
+  }
+  70% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.nose-pop {
+  animation: nose-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes nose-ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.nose-ripple {
+  animation: nose-ripple 0.55s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .activity-ripple,
   .activity-wave,
-  .activity-spin {
+  .activity-spin,
+  .activity-arrow,
+  .nose-pop,
+  .nose-ripple {
     animation: none;
+  }
+
+  .nose-ripple {
+    opacity: 0;
+  }
+
+  .hud-anim,
+  .hud-hidden-up,
+  .hud-hidden-left,
+  .hud-hidden-right {
+    transition: opacity 0.45s ease, visibility 0s linear 0.45s;
+    transform: none;
   }
 }

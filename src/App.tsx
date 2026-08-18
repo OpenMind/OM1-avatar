@@ -105,10 +105,14 @@ type AnimationState = (typeof ANIMATION_STATES)[number];
 export function App() {
   // State
   const [loaded, setLoaded] = useState(false);
+  const [loadingVisible, setLoadingVisible] = useState(true);
+  const loadingGraceRef = useRef<NodeJS.Timeout | null>(null);
   const [currentAnimation, setCurrentAnimation] = useState<AnimationState>('happy');
   const [allModes, setAllModes] = useState<string[]>([]);
   const [currentMode, setCurrentMode] = useState<string>('');
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [nosePresses, setNosePresses] = useState(0);
   const [isPublishing, setIsPublishing] = useState(false);
   const [asrText, setAsrText] = useState<string>('');
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
@@ -454,8 +458,11 @@ export function App() {
               return;
             }
 
-            // Handle avatar health check response
-            if (response.request_id === healthCheckRequestIdRef.current) {
+            // Handle avatar health check response. Match against every pending
+            // health request, not just the newest one — a reply slower than the
+            // 2s send interval would otherwise be ignored, its 5s timeout would
+            // fire, and the loading screen would flash in over the face.
+            if (response.request_id && healthCheckTimeoutsRef.current.has(response.request_id)) {
               if (response.code === 0 && response.status === 'active') {
                 console.log('Avatar health check success:', response);
 
@@ -616,6 +623,30 @@ export function App() {
     };
   }, []);
 
+  // Debounce the white loading screen: a brief health-check blip should not
+  // flash it over the black face. Only swap to it when the system has been
+  // unhealthy for a sustained stretch; recovery hides it immediately.
+  useEffect(() => {
+    if (loaded) {
+      if (loadingGraceRef.current) {
+        clearTimeout(loadingGraceRef.current);
+        loadingGraceRef.current = null;
+      }
+      setLoadingVisible(false);
+    } else if (!loadingVisible && !loadingGraceRef.current) {
+      loadingGraceRef.current = setTimeout(() => {
+        setLoadingVisible(true);
+        loadingGraceRef.current = null;
+      }, 3000);
+    }
+    return () => {
+      if (loadingGraceRef.current) {
+        clearTimeout(loadingGraceRef.current);
+        loadingGraceRef.current = null;
+      }
+    };
+  }, [loaded, loadingVisible]);
+
   // Separate effect to handle interval timing changes based on mode
   useEffect(() => {
     if (apiWsRef.current && apiWsRef.current.readyState === WebSocket.OPEN && apiIntervalRef.current) {
@@ -653,8 +684,73 @@ export function App() {
     }
   };
 
-  const ModeSelector = () => (
-    <div className="fixed top-4 right-4 z-50">
+  const toggleDebugInterface = () => {
+    if (debugVisible) {
+      setShowModeSelector(false);
+    }
+    setDebugVisible(!debugVisible);
+    setNosePresses((count) => count + 1);
+  };
+
+  // The face's nose: always visible, toggles the debug interface. Built as a
+  // plain element (not an inline component) so its DOM survives re-renders and
+  // the press transitions actually animate. The ripple/pop spans are keyed by
+  // press count so each tap replays their animations.
+  const nose = (
+    <button
+      type="button"
+      aria-label={debugVisible ? 'Hide debug interface' : 'Show debug interface'}
+      onClick={toggleDebugInterface}
+      className="group fixed left-1/2 top-[66%] z-[60] flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full"
+    >
+      {nosePresses > 0 && (
+        <span
+          key={`ripple-${nosePresses}`}
+          className="nose-ripple pointer-events-none absolute h-10 w-10 rounded-full border-2 border-white"
+        />
+      )}
+      <span
+        key={`pop-${nosePresses}`}
+        className={`${
+          nosePresses > 0 ? 'nose-pop' : ''
+        } block h-10 w-10 rounded-full border-[3px] border-white bg-transparent transition-all duration-200 ease-out group-active:scale-75 ${
+          debugVisible
+            ? 'opacity-100 shadow-[0_0_0_1px_rgba(0,0,0,0.1),0_0_20px_rgba(255,255,255,0.6)]'
+            : 'opacity-80 shadow-[0_0_0_1px_rgba(0,0,0,0.1),0_0_10px_rgba(255,255,255,0.3)]'
+        }`}
+      />
+    </button>
+  );
+
+  // Title shown top-center while the debug interface is open.
+  const debugTitle = (
+    <div
+      className={`fixed top-24 left-1/2 z-50 -translate-x-1/2 pointer-events-none hud-anim ${
+        debugVisible ? '' : 'hud-hidden-up'
+      }`}
+    >
+      <div
+        className="flex items-center gap-2 rounded-full px-4 py-2"
+        style={{
+          background: 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.55)',
+        }}
+      >
+        <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+        <span className="text-[12px] font-semibold uppercase leading-none tracking-[0.22em] text-white/85">
+          Debug Mode
+        </span>
+      </div>
+    </div>
+  );
+
+  const modeSelector = (
+    <div
+      className={`fixed top-4 right-4 z-50 hud-anim ${debugVisible ? '' : 'hud-hidden-up'}`}
+    >
       <div className="relative">
         <button
           onClick={() => setShowModeSelector(!showModeSelector)}
@@ -688,7 +784,7 @@ export function App() {
   );
 
   const systemStatusHud = showSystemStatus ? (
-    <SystemStatusHUD status={systemStatus} stale={systemStatusStale} />
+    <SystemStatusHUD status={systemStatus} stale={systemStatusStale} visible={debugVisible} />
   ) : null;
 
   const activityIndicator = activitySupported ? (
@@ -730,7 +826,7 @@ export function App() {
       ? pacedSpeech
       : activityDetail || asrText;
 
-  const cotWindow = <CotWindow cot={cot} stale={cotStale} />;
+  const cotWindow = <CotWindow cot={cot} stale={cotStale} visible={debugVisible} />;
 
   // Show WebRTC video player when publishing is active
   if (isPublishing && omApiKey && omApiKeyId) {
@@ -741,38 +837,54 @@ export function App() {
           apiKeyId={omApiKeyId}
           isPublishing={isPublishing}
         />
-        <ModeSelector />
+        {modeSelector}
+        {debugTitle}
         {systemStatusHud}
         {activityIndicator}
         {cotWindow}
+        {nose}
         <Subtitles text={subtitleText} />
       </>
     );
   }
 
-  // Show loading if OM1 WebSocket not connected
-  if (!loaded) {
+  // Show loading if OM1 has been unhealthy past the grace period
+  if (!loaded && loadingVisible) {
     return (
       <>
-        <ModeSelector />
+        {modeSelector}
+        {debugTitle}
         {systemStatusHud}
         {activityIndicator}
         {cotWindow}
         <Loading />
+        {nose}
         <CountdownTimer remainingSeconds={countdownSeconds} />
         <Subtitles text={subtitleText} />
       </>
     )
   }
 
-  // Show animations when connected and not publishing
+  // Show animations when connected and not publishing. The black backdrop
+  // stays put while the eyes fade out in debug mode, so there is no white
+  // flash behind the face during the transition.
   return (
     <>
-      {renderCurrentAnimation()}
-      <ModeSelector />
+      <div className="h-screen bg-black">
+        <div
+          className={`h-full transition-all duration-500 ease-out motion-reduce:transition-none ${
+            debugVisible ? 'scale-90 opacity-0' : 'scale-100 opacity-100'
+          }`}
+        >
+          {renderCurrentAnimation()}
+        </div>
+      </div>
+      {modeSelector}
+      {debugTitle}
       {systemStatusHud}
       {activityIndicator}
       {cotWindow}
+      {nose}
       <CountdownTimer remainingSeconds={countdownSeconds} />
       <Subtitles text={subtitleText} />
     </>

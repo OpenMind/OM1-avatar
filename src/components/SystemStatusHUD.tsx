@@ -13,6 +13,7 @@ import {
 interface SystemStatusHUDProps {
   status: NormalizedStatus | null;
   stale: boolean;
+  visible: boolean;
 }
 
 const STATE_COLORS: Record<SubsystemState, string> = {
@@ -328,13 +329,17 @@ function IconCell({
   );
 }
 
-export function SystemStatusHUD({ status, stale }: SystemStatusHUDProps) {
+export function SystemStatusHUD({ status, stale, visible }: SystemStatusHUDProps) {
   const downlink = useDownlink();
   const effective = status ?? staleStatus(0);
   const { overall, subsystems } = effective;
 
   return (
-    <div className="fixed top-4 left-4 z-50 pointer-events-none">
+    <div
+      className={`fixed top-1/2 right-4 z-50 -translate-y-1/2 pointer-events-none hud-anim ${
+        visible ? '' : 'hud-hidden-right'
+      }`}
+    >
       <div
         className="pointer-events-auto flex items-start gap-3 rounded-xl px-3 py-2.5"
         style={{

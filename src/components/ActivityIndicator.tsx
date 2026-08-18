@@ -1,3 +1,4 @@
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 import { ACTIVITIES } from '../utils/status';
 import type { Activity, ActivityState } from '../utils/status';
@@ -109,17 +110,26 @@ const LAMP_ICONS: Record<Activity, (props: IconProps) => ReactElement> = {
   speaking: SpeakingIcon,
 };
 
-function ActivityRow({ activity, active }: { activity: Activity; active: boolean }) {
+function ActivityBox({ activity, active }: { activity: Activity; active: boolean }) {
   const color = active ? ACTIVITY_COLORS[activity] : IDLE_COLOR;
   const Icon = LAMP_ICONS[activity];
 
   return (
     <div
-      className="flex items-center gap-3 rounded-lg py-2.5 pr-3 pl-2.5"
+      className="flex items-center gap-3 rounded-xl py-2.5 pr-4 pl-3"
       style={{
-        background: active ? `${ACTIVITY_COLORS[activity]}22` : 'transparent',
-        boxShadow: active ? `inset 0 0 0 1px ${ACTIVITY_COLORS[activity]}55` : 'none',
-        transition: 'background 0.25s ease, box-shadow 0.25s ease',
+        background: active
+          ? `linear-gradient(180deg, ${ACTIVITY_COLORS[activity]}33, rgba(8,8,12,0.95))`
+          : 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        border: active
+          ? `1px solid ${ACTIVITY_COLORS[activity]}88`
+          : '1px solid rgba(255,255,255,0.2)',
+        boxShadow: active
+          ? `0 8px 30px rgba(0,0,0,0.55), 0 0 18px ${ACTIVITY_COLORS[activity]}44`
+          : '0 8px 30px rgba(0,0,0,0.55)',
+        transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
       }}
     >
       <div
@@ -140,25 +150,76 @@ function ActivityRow({ activity, active }: { activity: Activity; active: boolean
   );
 }
 
+interface FlowArrowProps {
+  /** Bumps whenever this arrow should replay its flow animation; null while static. */
+  flowKey: number | null;
+}
+
+function FlowArrow({ flowKey }: FlowArrowProps) {
+  const flowing = flowKey !== null;
+
+  return (
+    <div aria-hidden="true" className="flex items-center px-1">
+      <svg
+        key={flowKey ?? 'static'}
+        width={24}
+        height={16}
+        viewBox="0 0 24 16"
+        fill="none"
+        stroke="rgba(255,255,255,0.75)"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path
+          className={flowing ? 'activity-arrow' : undefined}
+          style={flowing ? undefined : { opacity: 0.3 }}
+          d="M4 3l5 5-5 5"
+        />
+        <path
+          className={flowing ? 'activity-arrow' : undefined}
+          style={flowing ? { animationDelay: '0.3s' } : { opacity: 0.3 }}
+          d="M13 3l5 5-5 5"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export function ActivityIndicator({ state, stale }: ActivityIndicatorProps) {
   const live = stale ? null : state;
 
+  // Replay the flow animation on the arrow leading into the newly active box.
+  const [flow, setFlow] = useState<{ arrow: number; key: number } | null>(null);
+  const prevLive = useRef<ActivityState | null>(null);
+
+  useEffect(() => {
+    const prev = prevLive.current;
+    prevLive.current = live;
+    if (!live || live === 'idle' || live === prev) return;
+    const index = ACTIVITIES.indexOf(live);
+    if (index <= 0) return;
+    setFlow((current) => ({ arrow: index - 1, key: (current?.key ?? 0) + 1 }));
+    const timer = setTimeout(() => setFlow(null), 2000);
+    return () => clearTimeout(timer);
+  }, [live]);
+
   return (
-    <div className="fixed top-1/2 right-4 z-50 -translate-y-1/2 pointer-events-none">
+    <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 pointer-events-none">
       <div
-        className="pointer-events-auto flex w-[196px] flex-col gap-1.5 rounded-xl px-2.5 py-2.5"
+        className="pointer-events-auto flex flex-row items-center"
         style={{
-          background: 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.55)',
           opacity: stale ? 0.65 : 1,
           transition: 'opacity 0.3s ease',
         }}
       >
-        {ACTIVITIES.map((activity) => (
-          <ActivityRow key={activity} activity={activity} active={live === activity} />
+        {ACTIVITIES.map((activity, index) => (
+          <Fragment key={activity}>
+            {index > 0 && (
+              <FlowArrow flowKey={flow?.arrow === index - 1 ? flow.key : null} />
+            )}
+            <ActivityBox activity={activity} active={live === activity} />
+          </Fragment>
         ))}
       </div>
     </div>

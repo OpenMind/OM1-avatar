@@ -3,6 +3,7 @@ import type { CotKind, CotStatus } from '../utils/status';
 interface CotWindowProps {
   cot: CotStatus | null;
   stale: boolean;
+  visible: boolean;
 }
 
 const KIND_STYLES: Record<CotKind, { label: string; color: string }> = {
@@ -17,15 +18,19 @@ const KIND_STYLES: Record<CotKind, { label: string; color: string }> = {
 
 const MAX_ROWS = 5;
 
-export function CotWindow({ cot, stale }: CotWindowProps) {
+export function CotWindow({ cot, stale, visible }: CotWindowProps) {
   if (!cot) return null;
 
   const events = cot.events.slice(-MAX_ROWS);
 
   return (
-    <div className="fixed top-1/2 left-4 z-50 -translate-y-1/2 pointer-events-none">
+    <div
+      className={`fixed top-1/2 left-4 z-50 -translate-y-1/2 pointer-events-none hud-anim ${
+        visible ? '' : 'hud-hidden-left'
+      }`}
+    >
       <div
-        className="pointer-events-auto flex w-[144px] flex-col gap-1.5 rounded-xl px-2 py-2"
+        className="pointer-events-auto flex w-[432px] flex-col gap-1.5 rounded-xl px-2 py-2"
         style={{
           background: 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
           backdropFilter: 'blur(20px) saturate(180%)',
