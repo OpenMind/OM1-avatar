@@ -12,7 +12,7 @@ import ExcitedAnimation from './animations/face/Excited.riv';
 import HappyAnimation from './animations/face/Happy.riv';
 import SadAnimation from './animations/face/Sad.riv';
 import loadingAnimation from './animations/openmind-logo.riv';
-const apiWsUrl = getEnvVar('VITE_API_WEBSOCKET_URL', 'ws://localhost:6123');
+const apiWsUrl = getEnvVar('VITE_API_WEBSOCKET_URL', 'ws://localhost:6123/avatar');
 const omApiKey = getEnvVar('VITE_OM_API_KEY');
 const omApiKeyId = getEnvVar('VITE_OM_API_KEY_ID');
 const publishStatusApiUrl = 'https://api.openmind.com/api/core/teleops/video/publish/status';
