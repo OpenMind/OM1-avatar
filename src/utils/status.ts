@@ -24,6 +24,7 @@ const NUMERIC_FIELDS = [
   'last_playback_age_s',
   'rssi_dbm',
   'quality',
+  'rx_mbps',
 ] as const;
 
 export interface Subsystem {
@@ -36,6 +37,7 @@ export interface Subsystem {
   last_playback_age_s?: number;
   rssi_dbm?: number;
   quality?: number;
+  rx_mbps?: number;
 }
 
 export interface SystemStatus {

@@ -75,6 +75,29 @@ def read_text(path):
 
 # ---------------------------------------------------------------- wifi
 
+# Last rx_bytes sample per publish tick; the first tick has no baseline.
+_rx_sample = {"iface": None, "t": 0.0, "bytes": 0}
+
+
+def wifi_rx_mbps(iface):
+    raw = read_text(f"/sys/class/net/{iface}/statistics/rx_bytes")
+    if not raw:
+        return None
+    try:
+        rx = int(raw.strip())
+    except ValueError:
+        return None
+    now = time.monotonic()
+    mbps = None
+    if _rx_sample["iface"] == iface:
+        elapsed = now - _rx_sample["t"]
+        # Counter wraps/resets show up as rx < previous; skip that sample.
+        if elapsed > 0 and rx >= _rx_sample["bytes"]:
+            mbps = (rx - _rx_sample["bytes"]) * 8 / elapsed / 1e6
+    _rx_sample.update(iface=iface, t=now, bytes=rx)
+    return round(mbps, 2) if mbps is not None else None
+
+
 def wifi_status():
     raw = read_text("/proc/net/wireless")
     if not raw:
@@ -102,12 +125,16 @@ def wifi_status():
             state = "warn"
         else:
             state = "down"
-        return {
+        result = {
             "state": state,
             "detail": f"{iface.strip()} {rssi:.0f} dBm",
             "rssi_dbm": rssi,
             "quality": round(normalized, 2),
         }
+        rx_mbps = wifi_rx_mbps(iface.strip())
+        if rx_mbps is not None:
+            result["rx_mbps"] = rx_mbps
+        return result
 
     return {"state": "down", "detail": "no wireless link"}
 

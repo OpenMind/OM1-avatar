@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { NormalizedStatus, Subsystem, SubsystemState } from '../utils/status';
 import {
@@ -23,7 +23,7 @@ const STATE_COLORS: Record<SubsystemState, string> = {
   unknown: '#9ca3af',
 };
 
-const ICON_SIZE = 18;
+const ICON_SIZE = 26;
 
 const isReporting = (state: SubsystemState) => state === 'ok' || state === 'warn';
 
@@ -39,8 +39,8 @@ interface IconProps {
 function Heart({ state, stale }: { state: SubsystemState; stale: boolean }) {
   return (
     <svg
-      width="22"
-      height="22"
+      width="30"
+      height="30"
       viewBox="0 0 24 24"
       fill={STATE_COLORS[state]}
       style={{
@@ -95,7 +95,7 @@ function MicLevelBar({ subsystem }: IconProps) {
   return (
     <div
       title={`mic: ${state} — level from ${source}`}
-      className="relative h-9 w-[5px] overflow-hidden rounded-full"
+      className="relative h-13 w-[7px] overflow-hidden rounded-full"
       style={{ background: 'rgba(255,255,255,0.18)' }}
     >
       <div
@@ -157,10 +157,20 @@ function WifiIcon({ subsystem, downlink }: IconProps & { downlink?: number }) {
   const bars =
     state === 'down' ? 0 : hasRadio ? radioBars : estimated ? barsFromDownlink(downlink) : 0;
 
+  const rxMbps = subsystem?.rx_mbps;
+  const speed = rxMbps ?? downlink;
+  const speedDetail =
+    rxMbps !== undefined
+      ? `${rxMbps.toFixed(1)} Mbit/s down`
+      : downlink !== undefined
+        ? `~${downlink} Mbit/s down (browser estimate)`
+        : null;
+
   const detail = hasRadio
     ? [
         rssi !== undefined ? `${rssi} dBm` : null,
         quality !== undefined ? `quality ${quality.toFixed(2)}` : null,
+        speedDetail,
       ]
         .filter(Boolean)
         .join(', ')
@@ -169,7 +179,11 @@ function WifiIcon({ subsystem, downlink }: IconProps & { downlink?: number }) {
       : 'no radio data';
 
   return (
-    <IconCell state={state} title={`wi-fi: ${state} — ${detail}`} label={null}>
+    <IconCell
+      state={state}
+      title={`wi-fi: ${state} — ${detail}`}
+      label={speed !== undefined ? formatRate(speed, 'M') : null}
+    >
       <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24">
         {WIFI_BARS.map((bar, index) => {
           const filled = index < bars;
@@ -272,17 +286,69 @@ function LidarIcon({ subsystem }: IconProps) {
   );
 }
 
+const TEST_TONE_S = 0.6;
+
+function playTestTone(ctx: AudioContext, pan: number): Promise<void> {
+  return new Promise((resolve) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 440;
+
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+    gain.gain.setValueAtTime(0.3, now + TEST_TONE_S - 0.05);
+    gain.gain.linearRampToValueAtTime(0, now + TEST_TONE_S);
+
+    osc.connect(gain);
+    let tail: AudioNode = gain;
+    if (typeof ctx.createStereoPanner === 'function') {
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = pan;
+      gain.connect(panner);
+      tail = panner;
+    }
+    tail.connect(ctx.destination);
+
+    osc.onended = () => {
+      tail.disconnect();
+      resolve();
+    };
+    osc.start(now);
+    osc.stop(now + TEST_TONE_S);
+  });
+}
+
 function SpeakerIcon({ subsystem }: IconProps) {
   const state = subsystem?.state ?? 'unknown';
   const age = subsystem?.last_playback_age_s;
+  const [testingSide, setTestingSide] = useState<'left' | 'right' | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const runSpeakerTest = async () => {
+    if (testingSide !== null) return;
+    try {
+      const ctx = (audioCtxRef.current ??= new AudioContext());
+      await ctx.resume();
+      setTestingSide('left');
+      await playTestTone(ctx, -1);
+      await new Promise((r) => setTimeout(r, 200));
+      setTestingSide('right');
+      await playTestTone(ctx, 1);
+    } finally {
+      setTestingSide(null);
+    }
+  };
 
   return (
-    <IconCell
-      state={state}
+    <button
+      type="button"
+      onClick={runSpeakerTest}
       title={`speaker: ${state}${
         age !== undefined ? ` — last playback ${age.toFixed(1)}s ago` : ''
-      } (device present + last playback ok, not audibility)`}
-      label={null}
+      } (device present + last playback ok, not audibility) — press to test left, then right speaker`}
+      className="flex w-10 cursor-pointer flex-col items-center gap-1.5 rounded-md border-0 bg-transparent p-0"
     >
       <svg
         width={ICON_SIZE}
@@ -299,7 +365,13 @@ function SpeakerIcon({ subsystem }: IconProps) {
         <path d="M15.5 9.2a4 4 0 0 1 0 5.6" opacity={state === 'down' ? 0.35 : 1} />
         <path d="M18.4 6.6a8 8 0 0 1 0 10.8" opacity={state === 'down' ? 0.35 : 1} />
       </svg>
-    </IconCell>
+      <span
+        className="font-mono text-[12px] leading-none tabular-nums"
+        style={{ color: STATE_COLORS[state], transition: 'color 0.3s ease' }}
+      >
+        {testingSide === 'left' ? 'L' : testingSide === 'right' ? 'R' : ' '}
+      </span>
+    </button>
   );
 }
 
@@ -315,11 +387,11 @@ function IconCell({
   children: ReactNode;
 }) {
   return (
-    <div title={title} className="flex w-7 flex-col items-center gap-1">
+    <div title={title} className="flex w-10 flex-col items-center gap-1.5">
       {children}
       {label !== null && (
         <span
-          className="font-mono text-[9px] leading-none tabular-nums"
+          className="font-mono text-[12px] leading-none tabular-nums"
           style={{ color: STATE_COLORS[state], transition: 'color 0.3s ease' }}
         >
           {label}
@@ -341,7 +413,7 @@ export function SystemStatusHUD({ status, stale, visible }: SystemStatusHUDProps
       }`}
     >
       <div
-        className="pointer-events-auto flex items-start gap-3 rounded-xl px-3 py-2.5"
+        className="pointer-events-auto flex items-start gap-4 rounded-2xl px-4 py-3.5"
         style={{
           background: 'linear-gradient(180deg, rgba(28,28,32,0.88), rgba(8,8,12,0.95))',
           backdropFilter: 'blur(20px) saturate(180%)',
@@ -353,14 +425,14 @@ export function SystemStatusHUD({ status, stale, visible }: SystemStatusHUDProps
         <div className="flex flex-col items-center gap-2">
           <div
             title={`system: ${overall}${stale ? ' (no data — publisher silent)' : ''}`}
-            className="flex h-[22px] items-center"
+            className="flex h-[30px] items-center"
           >
             <Heart state={overall} stale={stale} />
           </div>
           <MicLevelBar subsystem={subsystems.mic} />
         </div>
 
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-start gap-3.5">
           <WifiIcon subsystem={subsystems.wifi} downlink={downlink} />
           <CameraFpsIcon subsystem={subsystems.camera} name="depth camera" variant="depth" />
           <CameraFpsIcon subsystem={subsystems.arducam} name="arducam" variant="rgb" />
